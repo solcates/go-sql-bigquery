@@ -24,7 +24,6 @@ type conn struct {
 	projectID string
 	bad       bool
 	closed    bool
-	ctx       context.Context
 }
 
 func (c *conn) prepareQuery(query string, args []driver.Value) (out string, err error) {
@@ -61,8 +60,9 @@ func (c *conn) Exec(query string, args []driver.Value) (res driver.Result, err e
 	if query, err = c.prepareQuery(query, args); err != nil {
 		return
 	}
+	ctx := context.TODO()
 	q := c.client.Query(query)
-	it, err := q.Read(context.TODO())
+	it, err := q.Read(ctx)
 	if err != nil {
 		return
 	}
@@ -88,9 +88,8 @@ func (c *conn) Exec(query string, args []driver.Value) (res driver.Result, err e
 func newConn(ctx context.Context, cfg *Config) (c *conn, err error) {
 	c = &conn{
 		cfg: cfg,
-		ctx: ctx,
 	}
-	c.client, err = bigquery.NewClient(context.TODO(), cfg.ProjectID)
+	c.client, err = bigquery.NewClient(ctx, cfg.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +108,12 @@ func NewConnector(connectionString string) *Connector {
 	return &Connector{connectionString: connectionString}
 }
 
-func (c *Connector) Connect(context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	cfg, err := cfgFromConnString(c.connectionString)
 	if err != nil {
 		return nil, err
 	}
-	return newConn(context.TODO(), cfg)
+	return newConn(ctx, cfg)
 }
 
 func (c *Connector) Driver() driver.Driver {
@@ -141,9 +140,9 @@ func (c *conn) Query(query string, args []driver.Value) (rows driver.Rows, err e
 	// TODO: Come back if we ever can avoid the Interface hack...
 
 	q := c.client.Query(query)
-
+	ctx := context.TODO()
 	var rowsIterator *bigquery.RowIterator
-	rowsIterator, err = q.Read(context.TODO())
+	rowsIterator, err = q.Read(ctx)
 	if err != nil {
 		return
 	}
