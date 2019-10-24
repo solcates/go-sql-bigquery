@@ -16,10 +16,8 @@ jobs:
         uses: actions/checkout@v1
       - name: Test
         run: |
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_CONTENTS" | base64 -d > /tmp/account.json
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_CONTENTS }}" | base64 -d > /tmp/account.json
           ls -al /tmp/account.json
-          cat /tmp/account.json
           go test -mod=vendor ./...
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/account.json
-          GOOGLE_APPLICATION_CREDENTIALS_CONTENTS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_CONTENTS }}
