@@ -5,30 +5,92 @@ import (
 	"context"
 	"database/sql/driver"
 	"github.com/sirupsen/logrus"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 const (
-	mockProjectID = "mock-project"
+	testTableName = "table1"
 )
 
-var testDriver *Driver
 var testConn *conn
-var testClient *bigquery.Client
-var testDataSet *bigquery.Dataset
+var testConfig *Config
 
-func setupConnTests(t testing.TB) func(t testing.TB) {
-	cfg, err := cfgFromConnString(testConnectionString)
+func init() {
+	var err error
+	ctx := context.TODO()
+	if os.Getenv(ConnectionStringEnvKey) != "" {
+		testConnectionString = os.Getenv(ConnectionStringEnvKey)
+	} else {
+		testConnectionString = mockConnectString
+	}
+	if err = setupConnections(); err != nil {
+		panic("Can not setup connections to Google Cloud... Check credentials, and connection string")
+	}
+
+	ds := testConn.client.Dataset(testConfig.DataSet)
+	_, err = ds.Metadata(ctx)
 	if err != nil {
-		t.Fatal(err)
+		panic("Can not get dataset, check your connection string, permissions, and that it exists in your project")
+	}
+	// Check if the teable is there... if not let's create it
+	t := ds.Table(testTableName)
+	if _, err := t.Metadata(ctx); err != nil {
+		// Table error
+		if strings.HasSuffix(err.Error(), ", notFound") {
+			// Need to create the table...
+			err = t.Create(ctx, &bigquery.TableMetadata{
+				Name:        testTableName,
+				Description: "",
+				Schema: bigquery.Schema{
+					{
+						Name: "name",
+						Type: "STRING",
+					}, {
+						Name: "number",
+						Type: "INT64",
+					},
+				},
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			// Add a single record for the test later
+			q := testConn.client.Query("INSERT INTO dataset1.table1 (name, number) VALUES('hello',1);")
+			_, err = q.Read(ctx)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			panic(err)
+		}
+
+	}
+}
+
+func setupConnections() (err error) {
+	testConfig, err = cfgFromConnString(testConnectionString)
+	if err != nil {
+		return
 	}
 	ctx := context.TODO()
-	testConn, err = newConn(ctx, cfg)
+	testConn, err = newConn(ctx, testConfig)
 	if err != nil {
+		return
+	}
+	return
+}
+
+func setupConnTests(t testing.TB) func(t testing.TB) {
+	if err := setupConnections(); err != nil {
 		t.Fatal(err)
 	}
+
 	logrus.SetLevel(logrus.DebugLevel)
+	// Check if the dataset and test table are live...
 	return func(t testing.TB) {
 
 	}

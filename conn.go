@@ -4,7 +4,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"context"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
@@ -138,13 +137,12 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 }
 
 func (c *conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
-	var q BigQueryQuery
 	// This is a HACK for the mocking that we have to do as the google cloud package doesn't include/use interfaces
 	// TODO: Come back if we ever can avoid the Interface hack...
 
-	q = c.client.Query(query)
+	q := c.client.Query(query)
 
-	var rowsIterator BigQueryRowIterator
+	var rowsIterator *bigquery.RowIterator
 	rowsIterator, err = q.Read(context.TODO())
 	if err != nil {
 		return
@@ -160,12 +158,8 @@ func (c *conn) Query(query string, args []driver.Value) (rows driver.Rows, err e
 		var row []bigquery.Value
 		err := rowsIterator.Next(&row)
 		if bqrows.columns == nil {
-			rt, ok := rowsIterator.(*bigquery.RowIterator)
-			if !ok {
-				err = errors.New("could not get column names")
-				return nil, err
-			}
-			for _, column := range rt.Schema {
+
+			for _, column := range rowsIterator.Schema {
 				bqrows.columns = append(bqrows.columns, column.Name)
 			}
 		}
