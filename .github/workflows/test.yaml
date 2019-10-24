@@ -21,3 +21,4 @@ jobs:
           go test -mod=vendor ./...
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/account.json
+          BIGQUERY_CONNECTION_STRING: ${{ secrets.connectionString }}
