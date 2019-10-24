@@ -16,7 +16,6 @@ jobs:
         uses: actions/checkout@v1
       - name: Test
         run: |
-          ls -al ~/.google
           echo ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_CONTENTS }} > /tmp/account.json
           go test -mod=vendor ./...
         env:
