@@ -18,17 +18,13 @@ jobs:
         env:
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
-          GOOGLE_APPLICATION_CREDENTIALS: ~/${{ secrets.ACCOUNT_ID }}.json
         with:
           args: info
-        name: Test
-        run: go test -mod=vendor ./...
-      - uses: exelban/gcloud@master
+      - name: Test
+        run: ls -al /tmp; go test -mod=vendor ./...
         env:
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
-          GOOGLE_APPLICATION_CREDENTIALS: ~/${{ secrets.ACCOUNT_ID }}.json
-        with:
-          args: info
-        name: Coverage
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/account.json
+      - name: Coverage
         run: go test -mod=vendor -coverage ./...
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/account.json
