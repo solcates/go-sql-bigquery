@@ -14,17 +14,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v1
-      - uses: exelban/gcloud@master
-        env:
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
-        with:
-          args: info
       - name: Test
-        run: ls -al /tmp; go test -mod=vendor ./...
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/account.json
-      - name: Coverage
-        run: go test -mod=vendor -coverage ./...
+        run: |
+          ls -al ~/.google
+          echo ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_CONTENTS }} > /tmp/account.json
+          go test -mod=vendor ./...
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/account.json
