@@ -20,7 +20,6 @@ func main() {
 		logrus.Fatal(err)
 	}
 	db.LogMode(true)
-	db.DropTable("dataset1.animals")
 	db.AutoMigrate(&Animal{})
 
 	// Add an animal

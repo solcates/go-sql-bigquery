@@ -16,6 +16,7 @@ import (
 type Dialect struct {
 	db gorm.SQLCommon
 	gorm.DefaultForeignKeyNamer
+	dataset string
 }
 
 func init() {
@@ -38,7 +39,8 @@ func (b *Dialect) SetDB(db gorm.SQLCommon) {
 		if err != nil {
 			logrus.Panic("invalid bigquery connection string should be like bigquery://projectid/us/somedataset")
 		}
-		defaultTableName = fmt.Sprintf("%s.%s", cfg.DataSet, defaultTableName)
+		b.dataset = cfg.DataSet
+		defaultTableName = fmt.Sprintf("%s.%s", b.dataset, defaultTableName)
 		return defaultTableName
 	}
 	b.db = db
@@ -110,13 +112,22 @@ func (b Dialect) RemoveIndex(tableName string, indexName string) error {
 	panic("implement me")
 }
 
-func (b *Dialect) HasTable(tableName string) bool {
-	logrus.Debugf("Asking for Table: %s", tableName)
-	ds := strings.Split(tableName, ".")
-	if len(ds) != 2 {
-		panic("got a bad tablename... shouldn't happen")
+func (b *Dialect) HasTable(in string) bool {
+	logrus.Debugf("Asking for Table: %s", in)
+	ds := strings.Split(in, ".")
+	var datasetName string
+	var tableName string
+	switch len(ds) {
+	case 2:
+		datasetName = ds[0]
+		tableName = ds[1]
+	case 1:
+		tableName = in
+		datasetName = b.dataset
+	default:
+		panic("invalid tablename")
 	}
-	query := fmt.Sprintf("SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES where table_name = \"%s\"", ds[0], ds[1])
+	query := fmt.Sprintf("SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES where table_name = \"%s\"", datasetName, tableName)
 	rows, err := b.db.Query(query)
 	if err != nil {
 		panic(err)
