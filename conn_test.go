@@ -72,7 +72,7 @@ func init() {
 }
 
 func setupConnections() (err error) {
-	testConfig, err = cfgFromConnString(testConnectionString)
+	testConfig, err = ConfigFromConnString(testConnectionString)
 	if err != nil {
 		return
 	}
@@ -142,13 +142,13 @@ func Test_cfgFromConnString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCfg, err := cfgFromConnString(tt.args.in)
+			gotCfg, err := ConfigFromConnString(tt.args.in)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("cfgFromConnString() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ConfigFromConnString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(gotCfg, tt.wantCfg) {
-				t.Errorf("cfgFromConnString() gotCfg = %v, want %v", gotCfg, tt.wantCfg)
+				t.Errorf("ConfigFromConnString() gotCfg = %v, want %v", gotCfg, tt.wantCfg)
 			}
 		})
 	}

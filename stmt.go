@@ -24,12 +24,11 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
-	logrus.Debugf("Got Exec in Stmt: %s", s.query)
+	logrus.Debugf("Got stmt.Exec: %s", s.query)
 	return s.c.Exec(s.query, args)
 }
 
 func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
-	logrus.Debugf("Got Query in Stmt: %s", s.query)
-
+	logrus.Debugf("Got stmt.Query: %s", s.query)
 	return s.c.Query(s.query, args)
 }

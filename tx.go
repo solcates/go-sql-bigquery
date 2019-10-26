@@ -12,12 +12,12 @@ func newTx(c *conn) (*tx, error) {
 
 // Commit currently just  passes through
 func (t *tx) Commit() (err error) {
-	logrus.Debug("Got Commit")
+	logrus.Debug("Got tx.Commit")
 	return
 }
 
 // Rollback currently just  passes through
 func (t *tx) Rollback() (err error) {
-	logrus.Debug("Got Rollback")
+	logrus.Debug("Got tx.Rollback")
 	return
 }

@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// cfgFromConnString will return the
-func cfgFromConnString(in string) (cfg *Config, err error) {
+// ConfigFromConnString will return the Config structures
+func ConfigFromConnString(in string) (cfg *Config, err error) {
 	// Expects format to be bigquery://projectid/location/dataset   that's IT!
 	// anything else will fail
 	if strings.HasPrefix(in, "bigquery://") {

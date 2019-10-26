@@ -10,7 +10,7 @@ import (
 )
 
 func setupRowsTest(t testing.TB) func(t testing.TB) {
-	cfg, err := cfgFromConnString(testConnectionString)
+	cfg, err := ConfigFromConnString(testConnectionString)
 	if err != nil {
 		t.Fatal(err)
 	}

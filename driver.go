@@ -17,7 +17,7 @@ type Driver struct {
 
 func (d *Driver) Open(connectionString string) (c driver.Conn, err error) {
 	//ctx := context.TODO()
-	if d.Config, err = cfgFromConnString(connectionString); err != nil {
+	if d.Config, err = ConfigFromConnString(connectionString); err != nil {
 		return
 	}
 

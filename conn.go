@@ -56,7 +56,7 @@ func (c *conn) prepareQuery(query string, args []driver.Value) (out string, err 
 }
 
 func (c *conn) Exec(query string, args []driver.Value) (res driver.Result, err error) {
-
+	logrus.Debugf("Got conn.Exec: %s", query)
 	if query, err = c.prepareQuery(query, args); err != nil {
 		return
 	}
@@ -81,6 +81,8 @@ func (c *conn) Exec(query string, args []driver.Value) (res driver.Result, err e
 	res = &result{
 		rowsAffected: int64(it.TotalRows),
 	}
+	logrus.Debugf("Results for conn.Exec: %s", data)
+
 	return
 }
 
@@ -109,7 +111,7 @@ func NewConnector(connectionString string) *Connector {
 }
 
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
-	cfg, err := cfgFromConnString(c.connectionString)
+	cfg, err := ConfigFromConnString(c.connectionString)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +140,7 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 func (c *conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
 	// This is a HACK for the mocking that we have to do as the google cloud package doesn't include/use interfaces
 	// TODO: Come back if we ever can avoid the Interface hack...
-
+	logrus.Debugf("Got conn.Query: %s", query)
 	q := c.client.Query(query)
 	ctx := context.TODO()
 	var rowsIterator *bigquery.RowIterator
