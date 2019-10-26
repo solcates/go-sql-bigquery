@@ -1,9 +1,74 @@
 package bigquery
 
 import (
+	"database/sql"
+	"database/sql/driver"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/mock"
 	"testing"
 )
+
+var (
+	testDialect *Dialect
+	testDB      *sql.DB
+	testDBMock  sqlmock.Sqlmock
+	testRows    *sqlmock.Rows
+)
+
+type mockRows struct {
+	mock.Mock
+}
+
+func (m mockRows) Columns() []string {
+	panic("implement me")
+}
+
+func (m mockRows) Close() error {
+	panic("implement me")
+}
+
+func (m mockRows) Next(dest []driver.Value) error {
+	args := m.Called(dest)
+	return args.Error(0)
+}
+
+type mockDB struct {
+	mock.Mock
+}
+
+func (m *mockDB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	panic("implement me")
+}
+
+func (m *mockDB) Prepare(query string) (*sql.Stmt, error) {
+	panic("implement me")
+}
+
+func (m *mockDB) Query(query string, args ...interface{}) (*sql.Rows, error) {
+
+	a := m.Called(query, args)
+	return a.Get(0).(*sql.Rows), a.Error(1)
+}
+
+func (m *mockDB) QueryRow(query string, args ...interface{}) *sql.Row {
+	panic("implement me")
+}
+
+func setupDialectTests(t testing.TB) func(t testing.TB) {
+	testDialect = new(Dialect)
+	var err error
+	testDB, testDBMock, err = sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	testDialect.db = testDB
+
+	testDialect.dataset = "dataset1"
+	return func(t testing.TB) {
+
+	}
+}
 
 func TestDialect_BindVar(t *testing.T) {
 	type fields struct {
@@ -234,12 +299,17 @@ func TestDialect_HasIndex(t *testing.T) {
 }
 
 func TestDialect_HasTable(t *testing.T) {
+	teardown := setupDialectTests(t)
+	defer teardown(t)
 	type fields struct {
 		db                     gorm.SQLCommon
 		DefaultForeignKeyNamer gorm.DefaultForeignKeyNamer
+		data                   []byte
 	}
 	type args struct {
 		tableName string
+		query     string
+		args      []interface{}
 	}
 	tests := []struct {
 		name   string
@@ -247,14 +317,47 @@ func TestDialect_HasTable(t *testing.T) {
 		args   args
 		want   bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "OK",
+			fields: fields{
+				db:                     testDialect.db,
+				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
+				data:                   []byte("table1"),
+			},
+			args: args{
+				tableName: "table1",
+				query:     "SELECT table_name FROM dataset1.INFORMATION_SCHEMA.TABLES where table_name = \"table1\"",
+				args:      nil,
+			},
+
+			want: true,
+		}, {
+			name: "Error",
+			fields: fields{
+				db:                     testDialect.db,
+				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
+				data:                   nil,
+			},
+			args: args{
+				tableName: "table2",
+				query:     "SELECT table_name FROM dataset1.INFORMATION_SCHEMA.TABLES where table_name = \"table2\"",
+				args:      nil,
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := Dialect{
+				dataset:                testDialect.dataset,
 				db:                     tt.fields.db,
 				DefaultForeignKeyNamer: tt.fields.DefaultForeignKeyNamer,
 			}
+
+			rows := sqlmock.NewRows([]string{"table_name"}).
+				AddRow(tt.fields.data)
+
+			testDBMock.ExpectQuery(tt.args.query).WillReturnRows(rows)
 			if got := b.HasTable(tt.args.tableName); got != tt.want {
 				t.Errorf("HasTable() = %v, want %v", got, tt.want)
 			}

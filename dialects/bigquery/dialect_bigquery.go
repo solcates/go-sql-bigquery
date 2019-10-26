@@ -140,7 +140,15 @@ func (b *Dialect) HasTable(in string) bool {
 		return false
 	} else {
 		logrus.Debug("Found Table")
-		return true
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			panic(err)
+		}
+		logrus.Infof("Data: %s", string(data))
+		if string(data) == in {
+			return true
+		}
+
 	}
 	return false
 }
