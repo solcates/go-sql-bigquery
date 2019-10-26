@@ -114,6 +114,7 @@ func (b Dialect) RemoveIndex(tableName string, indexName string) error {
 
 func (b *Dialect) HasTable(in string) bool {
 	logrus.Debugf("Asking for Table: %s", in)
+	b.SetDB(b.db)
 	ds := strings.Split(in, ".")
 	var datasetName string
 	var tableName string

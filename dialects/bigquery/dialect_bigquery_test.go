@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jinzhu/gorm"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"testing"
 )
@@ -56,6 +57,8 @@ func (m *mockDB) QueryRow(query string, args ...interface{}) *sql.Row {
 }
 
 func setupDialectTests(t testing.TB) func(t testing.TB) {
+	// Debug stuff
+	logrus.SetLevel(logrus.DebugLevel)
 	testDialect = new(Dialect)
 	var err error
 	testDB, testDBMock, err = sqlmock.New()
@@ -63,7 +66,6 @@ func setupDialectTests(t testing.TB) func(t testing.TB) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	testDialect.db = testDB
-
 	testDialect.dataset = "dataset1"
 	return func(t testing.TB) {
 
@@ -305,6 +307,7 @@ func TestDialect_HasTable(t *testing.T) {
 		db                     gorm.SQLCommon
 		DefaultForeignKeyNamer gorm.DefaultForeignKeyNamer
 		data                   []byte
+		dataset                string
 	}
 	type args struct {
 		tableName string
@@ -318,11 +321,12 @@ func TestDialect_HasTable(t *testing.T) {
 		want   bool
 	}{
 		{
-			name: "OK",
+			name: "OK, Simple",
 			fields: fields{
 				db:                     testDialect.db,
 				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
 				data:                   []byte("table1"),
+				dataset:                "dataset1",
 			},
 			args: args{
 				tableName: "table1",
@@ -332,11 +336,27 @@ func TestDialect_HasTable(t *testing.T) {
 
 			want: true,
 		}, {
+			name: "OK, Underscore, found",
+			fields: fields{
+				db:                     testDialect.db,
+				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
+				data:                   []byte("data_stores"),
+				dataset:                "app_bigquery",
+			},
+			args: args{
+				tableName: "data_stores",
+				query:     "SELECT table_name FROM app_bigquery.INFORMATION_SCHEMA.TABLES where table_name = \"data_stores\"",
+				args:      nil,
+			},
+			want: true,
+		}, {
 			name: "Error",
 			fields: fields{
 				db:                     testDialect.db,
 				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
 				data:                   nil,
+				dataset:                "dataset1",
+
 			},
 			args: args{
 				tableName: "table2",
@@ -349,7 +369,7 @@ func TestDialect_HasTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := Dialect{
-				dataset:                testDialect.dataset,
+				dataset:                tt.fields.dataset,
 				db:                     tt.fields.db,
 				DefaultForeignKeyNamer: tt.fields.DefaultForeignKeyNamer,
 			}
