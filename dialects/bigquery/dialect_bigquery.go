@@ -5,6 +5,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	_ "github.com/solcates/go-sql-bigquery"
+	bigquery "github.com/solcates/go-sql-bigquery"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,11 +29,16 @@ func (b *Dialect) GetName() string {
 
 func (b *Dialect) SetDB(db gorm.SQLCommon) {
 	gorm.DefaultTableNameHandler = func(db *gorm.DB, defaultTableName string) string {
-		//d, ok := db.DB().Driver().(*bigquery.Driver)
-		//if ok {
-		//	return fmt.Sprintf("%s.%s", d.Config.DataSet, defaultTableName)
-		//}
-		defaultTableName = "dataset1." + defaultTableName
+		uri := os.Getenv(bigquery.ConnectionStringEnvKey)
+		if uri == "" {
+			logrus.Panicf("no connection string found in environment... required currently, set %s", bigquery.ConnectionStringEnvKey)
+		}
+		var cfg *bigquery.Config
+		cfg, err := bigquery.ConfigFromConnString(uri)
+		if err != nil {
+			logrus.Panic("invalid bigquery connection string should be like bigquery://projectid/us/somedataset")
+		}
+		defaultTableName = fmt.Sprintf("%s.%s", cfg.DataSet, defaultTableName)
 		return defaultTableName
 	}
 	b.db = db
