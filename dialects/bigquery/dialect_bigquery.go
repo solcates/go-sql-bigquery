@@ -116,19 +116,17 @@ func (b *Dialect) HasTable(in string) bool {
 	logrus.Debugf("Asking for Table: %s", in)
 	b.SetDB(b.db)
 	ds := strings.Split(in, ".")
-	var datasetName string
 	var tableName string
 	switch len(ds) {
 	case 2:
-		datasetName = ds[0]
 		tableName = ds[1]
 	case 1:
 		tableName = in
-		datasetName = b.dataset
 	default:
 		panic("invalid tablename")
 	}
-	query := fmt.Sprintf("SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES where table_name = \"%s\"", datasetName, tableName)
+	logrus.Debugf("Dataset: %s", b.dataset)
+	query := fmt.Sprintf("SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES where table_name = \"%s\"", b.dataset, tableName)
 	rows, err := b.db.Query(query)
 	if err != nil {
 		panic(err)
