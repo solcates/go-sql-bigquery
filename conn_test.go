@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"os"
 	"reflect"
 	"strings"
@@ -17,6 +18,8 @@ const (
 
 var testConn *Conn
 var testConfig *Config
+var testClient *bigquery.Client
+var testMockDataset *mockDataset
 
 func init() {
 	var err error
@@ -81,6 +84,10 @@ func setupConnections() (err error) {
 	if err != nil {
 		return
 	}
+	testClient, err = bigquery.NewClient(ctx, testConfig.ProjectID)
+	testConn.projectID = testConfig.ProjectID
+	testConn.ds = testClient.Dataset(testConfig.DataSet)
+	testMockDataset = &mockDataset{}
 	return
 }
 
@@ -96,7 +103,7 @@ func setupConnTests(t testing.TB) func(t testing.TB) {
 	}
 }
 
-func Test_cfgFromConnString(t *testing.T) {
+func TestConfigFromConnString(t *testing.T) {
 	teardown := setupConnTests(t)
 	defer teardown(t)
 	type args struct {
@@ -186,7 +193,7 @@ func Test_conn_Ping(t *testing.T) {
 	}
 }
 
-func Test_conn_Query(t *testing.T) {
+func TestConn_Query(t *testing.T) {
 	teardown := setupConnTests(t)
 	defer teardown(t)
 	type fields struct {
@@ -252,33 +259,9 @@ func Test_conn_Query(t *testing.T) {
 	}
 }
 
-func TestConfigFromConnString(t *testing.T) {
-	type args struct {
-		in string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *Config
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ConfigFromConnString(tt.args.in)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ConfigFromConnString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ConfigFromConnString() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestConnector_Connect(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type fields struct {
 		Info             map[string]string
 		Client           *bigquery.Client
@@ -294,7 +277,29 @@ func TestConnector_Connect(t *testing.T) {
 		want    driver.Conn
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "OK",
+			fields: fields{
+				Info:             nil,
+				Client:           testClient,
+				connectionString: testConnectionString,
+			},
+			args: args{
+				ctx: nil,
+			},
+			want: &Conn{
+				cfg:    testConfig,
+				client: testClient,
+				ds: &bigquery.Dataset{
+					ProjectID: testConfig.ProjectID,
+					DatasetID: testConfig.DataSet,
+				},
+				projectID: testConfig.ProjectID,
+				bad:       false,
+				closed:    false,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -308,7 +313,7 @@ func TestConnector_Connect(t *testing.T) {
 				t.Errorf("Connect() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if reflect.TypeOf(got) != reflect.TypeOf(tt.want) {
 				t.Errorf("Connect() got = %v, want %v", got, tt.want)
 			}
 		})
@@ -316,6 +321,8 @@ func TestConnector_Connect(t *testing.T) {
 }
 
 func TestConnector_Driver(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type fields struct {
 		Info             map[string]string
 		Client           *bigquery.Client
@@ -343,6 +350,8 @@ func TestConnector_Driver(t *testing.T) {
 }
 
 func TestNewConnector(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type args struct {
 		connectionString string
 	}
@@ -363,6 +372,8 @@ func TestNewConnector(t *testing.T) {
 }
 
 func TestNewStmt(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type args struct {
 		query string
 		c     *Conn
@@ -383,7 +394,9 @@ func TestNewStmt(t *testing.T) {
 	}
 }
 
-func Test_conn_Begin(t *testing.T) {
+func TestConn_Begin(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type fields struct {
 		cfg       *Config
 		client    *bigquery.Client
@@ -422,7 +435,9 @@ func Test_conn_Begin(t *testing.T) {
 	}
 }
 
-func Test_conn_Close(t *testing.T) {
+func TestConn_Close(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type fields struct {
 		cfg       *Config
 		client    *bigquery.Client
@@ -455,7 +470,9 @@ func Test_conn_Close(t *testing.T) {
 	}
 }
 
-func Test_conn_Exec(t *testing.T) {
+func TestConn_Exec(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type fields struct {
 		cfg       *Config
 		client    *bigquery.Client
@@ -499,11 +516,13 @@ func Test_conn_Exec(t *testing.T) {
 	}
 }
 
-func Test_conn_Ping1(t *testing.T) {
+func TestConn_Ping(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type fields struct {
 		cfg       *Config
 		client    *bigquery.Client
-		ds        *bigquery.Dataset
+		ds        Dataset
 		projectID string
 		bad       bool
 		closed    bool
@@ -517,7 +536,21 @@ func Test_conn_Ping1(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "OK",
+			fields: fields{
+				cfg: testConfig,
+				client: &bigquery.Client{
+					Location: "us",
+				},
+				ds:        testMockDataset,
+				projectID: testConfig.DataSet,
+			},
+			args: args{
+				ctx: context.TODO(),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -529,6 +562,7 @@ func Test_conn_Ping1(t *testing.T) {
 				bad:       tt.fields.bad,
 				closed:    tt.fields.closed,
 			}
+			testMockDataset.config = testConfig
 			if err := c.Ping(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Ping() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -536,37 +570,31 @@ func Test_conn_Ping1(t *testing.T) {
 	}
 }
 
-func Test_conn_Prepare(t *testing.T) {
-	type fields struct {
-		cfg       *Config
-		client    *bigquery.Client
-		ds        *bigquery.Dataset
-		projectID string
-		bad       bool
-		closed    bool
-	}
+func TestConn_Prepare(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
+
 	type args struct {
 		query string
 	}
 	tests := []struct {
 		name     string
-		fields   fields
 		args     args
 		wantStmt driver.Stmt
 		wantErr  bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "OK",
+			args: args{
+				query: "SELECT * FROM SOMETHING test = ? ;",
+			},
+			wantStmt: NewStmt("SELECT * FROM SOMETHING test = ? ;",testConn),
+			wantErr:  false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Conn{
-				cfg:       tt.fields.cfg,
-				client:    tt.fields.client,
-				ds:        tt.fields.ds,
-				projectID: tt.fields.projectID,
-				bad:       tt.fields.bad,
-				closed:    tt.fields.closed,
-			}
+			c := testConn
 			gotStmt, err := c.Prepare(tt.args.query)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Prepare() error = %v, wantErr %v", err, tt.wantErr)
@@ -579,82 +607,34 @@ func Test_conn_Prepare(t *testing.T) {
 	}
 }
 
-func Test_conn_Query1(t *testing.T) {
-	type fields struct {
-		cfg       *Config
-		client    *bigquery.Client
-		ds        *bigquery.Dataset
-		projectID string
-		bad       bool
-		closed    bool
-	}
-	type args struct {
-		query string
-		args  []driver.Value
-	}
-	tests := []struct {
-		name     string
-		fields   fields
-		args     args
-		wantRows driver.Rows
-		wantErr  bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := &Conn{
-				cfg:       tt.fields.cfg,
-				client:    tt.fields.client,
-				ds:        tt.fields.ds,
-				projectID: tt.fields.projectID,
-				bad:       tt.fields.bad,
-				closed:    tt.fields.closed,
-			}
-			gotRows, err := c.Query(tt.args.query, tt.args.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(gotRows, tt.wantRows) {
-				t.Errorf("Query() gotRows = %v, want %v", gotRows, tt.wantRows)
-			}
-		})
-	}
-}
+func TestConn_prepareQuery(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 
-func Test_conn_prepareQuery(t *testing.T) {
-	type fields struct {
-		cfg       *Config
-		client    *bigquery.Client
-		ds        *bigquery.Dataset
-		projectID string
-		bad       bool
-		closed    bool
-	}
 	type args struct {
 		query string
 		args  []driver.Value
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
 		wantOut string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "OK",
+			args: args{
+				query: "",
+				args:  nil,
+			},
+			wantOut: "",
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Conn{
-				cfg:       tt.fields.cfg,
-				client:    tt.fields.client,
-				ds:        tt.fields.ds,
-				projectID: tt.fields.projectID,
-				bad:       tt.fields.bad,
-				closed:    tt.fields.closed,
-			}
+			c := testConn
+
 			gotOut, err := c.prepareQuery(tt.args.query, tt.args.args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("prepareQuery() error = %v, wantErr %v", err, tt.wantErr)
@@ -667,7 +647,9 @@ func Test_conn_prepareQuery(t *testing.T) {
 	}
 }
 
-func Test_newConn(t *testing.T) {
+func TestNewConn(t *testing.T) {
+	teardown := setupConnTests(t)
+	defer teardown(t)
 	type args struct {
 		ctx context.Context
 		cfg *Config
@@ -694,194 +676,15 @@ func Test_newConn(t *testing.T) {
 	}
 }
 
-func Test_newTx(t *testing.T) {
-	type args struct {
-		c *Conn
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *tx
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := newTx(tt.args.c)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("newTx() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("newTx() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
+type mockDataset struct {
+	mock.Mock
+	*bigquery.Dataset
+	config *Config
 }
 
-func Test_stmt_Close(t *testing.T) {
-	type fields struct {
-		query string
-		c     *Conn
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &stmt{
-				query: tt.fields.query,
-				c:     tt.fields.c,
-			}
-			if err := s.Close(); (err != nil) != tt.wantErr {
-				t.Errorf("Close() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_stmt_Exec(t *testing.T) {
-	type fields struct {
-		query string
-		c     *Conn
-	}
-	type args struct {
-		args []driver.Value
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    driver.Result
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &stmt{
-				query: tt.fields.query,
-				c:     tt.fields.c,
-			}
-			got, err := s.Exec(tt.args.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Exec() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Exec() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_stmt_NumInput(t *testing.T) {
-	type fields struct {
-		query string
-		c     *Conn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   int
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &stmt{
-				query: tt.fields.query,
-				c:     tt.fields.c,
-			}
-			if got := s.NumInput(); got != tt.want {
-				t.Errorf("NumInput() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_stmt_Query(t *testing.T) {
-	type fields struct {
-		query string
-		c     *Conn
-	}
-	type args struct {
-		args []driver.Value
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    driver.Rows
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &stmt{
-				query: tt.fields.query,
-				c:     tt.fields.c,
-			}
-			got, err := s.Query(tt.args.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Query() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_tx_Commit(t1 *testing.T) {
-	type fields struct {
-		c *Conn
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &tx{
-				c: tt.fields.c,
-			}
-			if err := t.Commit(); (err != nil) != tt.wantErr {
-				t1.Errorf("Commit() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_tx_Rollback(t1 *testing.T) {
-	type fields struct {
-		c *Conn
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &tx{
-				c: tt.fields.c,
-			}
-			if err := t.Rollback(); (err != nil) != tt.wantErr {
-				t1.Errorf("Rollback() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
+func (m *mockDataset) Metadata(ctx context.Context) (md *bigquery.DatasetMetadata, err error) {
+	return &bigquery.DatasetMetadata{
+		Name:     m.config.DataSet,
+		Location: m.config.Location,
+	}, nil
 }
