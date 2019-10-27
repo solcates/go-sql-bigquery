@@ -18,18 +18,18 @@ import (
 type Dialect struct {
 	db gorm.SQLCommon
 	gorm.DefaultForeignKeyNamer
-	Dataset string
-	client  *bigquery2.Client
+	cfg    *bigquery.Config
+	client *bigquery2.Client
 }
 
 func init() {
 	client, cfg := getClient()
 	gorm.RegisterDialect("bigquery", &Dialect{
-		Dataset: cfg.DataSet,
-		client:  client,
+		cfg:    cfg,
+		client: client,
 	})
-
 }
+
 func getClient() (*bigquery2.Client, *bigquery.Config) {
 	uri := os.Getenv(bigquery.ConnectionStringEnvKey)
 
@@ -59,8 +59,8 @@ func (b *Dialect) SetDB(db gorm.SQLCommon) {
 		if err != nil {
 			logrus.Panic("invalid bigquery connection string should be like bigquery://projectid/us/somedataset")
 		}
-		b.Dataset = cfg.DataSet
-		defaultTableName = fmt.Sprintf("%s.%s", b.Dataset, defaultTableName)
+		b.cfg = cfg
+		defaultTableName = fmt.Sprintf("%s.%s", b.cfg.DataSet, defaultTableName)
 		return defaultTableName
 	}
 	b.db = db
@@ -145,7 +145,7 @@ func (b *Dialect) HasTable(in string) bool {
 	default:
 		panic("HasTable| invalid tablename")
 	}
-	logrus.Debugf("HasTable| Dataset: %s", b.Dataset)
+	logrus.Debugf("HasTable| Dataset: %s", b.cfg.DataSet)
 	client, cfg := getClient()
 
 	d := client.Dataset(cfg.DataSet)

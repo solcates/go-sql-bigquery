@@ -6,6 +6,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
+	bigquery "github.com/solcates/go-sql-bigquery"
 	"github.com/stretchr/testify/mock"
 	"testing"
 )
@@ -66,7 +67,11 @@ func setupDialectTests(t testing.TB) func(t testing.TB) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	testDialect.db = testDB
-	testDialect.Dataset = "dataset1"
+	testDialect.cfg = &bigquery.Config{
+		ProjectID: "go-sql-binary",
+		Location:  "us",
+		DataSet:   "dataset1",
+	}
 	return func(t testing.TB) {
 
 	}
@@ -307,7 +312,7 @@ func TestDialect_HasTable(t *testing.T) {
 		db                     gorm.SQLCommon
 		DefaultForeignKeyNamer gorm.DefaultForeignKeyNamer
 		data                   []byte
-		dataset                string
+		cfg                    *bigquery.Config
 	}
 	type args struct {
 		tableName string
@@ -326,7 +331,11 @@ func TestDialect_HasTable(t *testing.T) {
 				db:                     testDialect.db,
 				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
 				data:                   []byte("table1"),
-				dataset:                "dataset1",
+				cfg: &bigquery.Config{
+					ProjectID: "go-sql-bigquery",
+					Location:  "us",
+					DataSet:   "dataset1",
+				},
 			},
 			args: args{
 				tableName: "table1",
@@ -340,7 +349,11 @@ func TestDialect_HasTable(t *testing.T) {
 				db:                     testDialect.db,
 				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
 				data:                   []byte("data_stores"),
-				dataset:                "app_bigquery",
+				cfg: &bigquery.Config{
+					ProjectID: "go-sql-bigquery",
+					Location:  "us",
+					DataSet:   "app-bigquery",
+				},
 			},
 			args: args{
 				tableName: "table1",
@@ -354,11 +367,15 @@ func TestDialect_HasTable(t *testing.T) {
 				db:                     testDialect.db,
 				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
 				data:                   nil,
-				dataset:                "dataset1",
+				cfg: &bigquery.Config{
+					ProjectID: "go-sql-bigquery",
+					Location:  "us",
+					DataSet:   "dataset1",
+				},
 			},
 			args: args{
 				tableName: "table2",
-				args: nil,
+				args:      nil,
 			},
 			want: false,
 		},
@@ -366,7 +383,7 @@ func TestDialect_HasTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := Dialect{
-				Dataset:                tt.fields.dataset,
+				cfg:                    tt.fields.cfg,
 				db:                     tt.fields.db,
 				DefaultForeignKeyNamer: tt.fields.DefaultForeignKeyNamer,
 			}
