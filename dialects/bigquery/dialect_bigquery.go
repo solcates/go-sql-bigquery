@@ -145,9 +145,8 @@ func (b *Dialect) HasTable(in string) bool {
 	default:
 		panic("HasTable| invalid tablename")
 	}
-	logrus.Debugf("HasTable| Dataset: %s", b.cfg.DataSet)
 	client, cfg := getClient()
-
+	logrus.Debugf("HasTable| Dataset: %s", cfg.DataSet)
 	d := client.Dataset(cfg.DataSet)
 	t := d.Table(tableName)
 	md, _ := t.Metadata(context.TODO())
