@@ -14,7 +14,7 @@ func setupRowsTest(t testing.TB) func(t testing.TB) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testConn, err = newConn(context.TODO(), cfg)
+	testConn, err = NewConn(context.TODO(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func Test_bqRows_Close(t *testing.T) {
 	type fields struct {
 		columns []string
 		rs      resultSet
-		c       *conn
+		c       *Conn
 	}
 	tests := []struct {
 		name    string
@@ -71,7 +71,7 @@ func Test_bqRows_Columns(t *testing.T) {
 	type fields struct {
 		columns []string
 		rs      resultSet
-		c       *conn
+		c       *Conn
 	}
 	tests := []struct {
 		name   string
@@ -106,7 +106,7 @@ func Test_bqRows_Next(t *testing.T) {
 	type fields struct {
 		columns []string
 		rs      resultSet
-		c       *conn
+		c       *Conn
 	}
 	type args struct {
 		dest []driver.Value

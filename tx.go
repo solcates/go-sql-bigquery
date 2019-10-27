@@ -3,10 +3,10 @@ package bigquery
 import "github.com/sirupsen/logrus"
 
 type tx struct {
-	c *conn
+	c *Conn
 }
 
-func newTx(c *conn) (*tx, error) {
+func newTx(c *Conn) (*tx, error) {
 	return &tx{c: c}, nil
 }
 

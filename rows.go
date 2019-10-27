@@ -14,7 +14,7 @@ type resultSet struct {
 type bqRows struct {
 	columns []string
 	rs      resultSet
-	c       *conn
+	c       *Conn
 }
 
 func (b *bqRows) Columns() []string {

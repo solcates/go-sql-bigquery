@@ -66,7 +66,7 @@ func setupDialectTests(t testing.TB) func(t testing.TB) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	testDialect.db = testDB
-	testDialect.dataset = "dataset1"
+	testDialect.Dataset = "dataset1"
 	return func(t testing.TB) {
 
 	}
@@ -330,7 +330,6 @@ func TestDialect_HasTable(t *testing.T) {
 			},
 			args: args{
 				tableName: "table1",
-				query:     "SELECT table_name FROM dataset1.INFORMATION_SCHEMA.TABLES where table_name = \"table1\"",
 				args:      nil,
 			},
 
@@ -344,9 +343,9 @@ func TestDialect_HasTable(t *testing.T) {
 				dataset:                "app_bigquery",
 			},
 			args: args{
-				tableName: "data_stores",
-				query:     "SELECT table_name FROM app_bigquery.INFORMATION_SCHEMA.TABLES where table_name = \"data_stores\"",
-				args:      nil,
+				tableName: "table1",
+
+				args: nil,
 			},
 			want: true,
 		}, {
@@ -356,12 +355,10 @@ func TestDialect_HasTable(t *testing.T) {
 				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
 				data:                   nil,
 				dataset:                "dataset1",
-
 			},
 			args: args{
 				tableName: "table2",
-				query:     "SELECT table_name FROM dataset1.INFORMATION_SCHEMA.TABLES where table_name = \"table2\"",
-				args:      nil,
+				args: nil,
 			},
 			want: false,
 		},
@@ -369,7 +366,7 @@ func TestDialect_HasTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := Dialect{
-				dataset:                tt.fields.dataset,
+				Dataset:                tt.fields.dataset,
 				db:                     tt.fields.db,
 				DefaultForeignKeyNamer: tt.fields.DefaultForeignKeyNamer,
 			}

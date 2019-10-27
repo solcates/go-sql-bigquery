@@ -17,7 +17,7 @@ type Config struct {
 	DataSet   string
 }
 
-type conn struct {
+type Conn struct {
 	cfg       *Config
 	client    *bigquery.Client
 	ds        *bigquery.Dataset
@@ -26,7 +26,7 @@ type conn struct {
 	closed    bool
 }
 
-func (c *conn) prepareQuery(query string, args []driver.Value) (out string, err error) {
+func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err error) {
 	if len(args) > 0 {
 		//logrus.Debugf("Preparing Query: %s ", query)
 
@@ -55,8 +55,8 @@ func (c *conn) prepareQuery(query string, args []driver.Value) (out string, err 
 	return
 }
 
-func (c *conn) Exec(query string, args []driver.Value) (res driver.Result, err error) {
-	logrus.Debugf("Got conn.Exec: %s", query)
+func (c *Conn) Exec(query string, args []driver.Value) (res driver.Result, err error) {
+	logrus.Debugf("Got Conn.Exec: %s", query)
 	if query, err = c.prepareQuery(query, args); err != nil {
 		return
 	}
@@ -81,14 +81,14 @@ func (c *conn) Exec(query string, args []driver.Value) (res driver.Result, err e
 	res = &result{
 		rowsAffected: int64(it.TotalRows),
 	}
-	logrus.Debugf("Results for conn.Exec: %s", data)
+	logrus.Debugf("Results for Conn.Exec: %s", data)
 
 	return
 }
 
-// newConn returns a connection for this Config
-func newConn(ctx context.Context, cfg *Config) (c *conn, err error) {
-	c = &conn{
+// NewConn returns a connection for this Config
+func NewConn(ctx context.Context, cfg *Config) (c *Conn, err error) {
+	c = &Conn{
 		cfg: cfg,
 	}
 	c.client, err = bigquery.NewClient(ctx, cfg.ProjectID)
@@ -115,7 +115,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newConn(ctx, cfg)
+	return NewConn(ctx, cfg)
 }
 
 func (c *Connector) Driver() driver.Driver {
@@ -123,7 +123,7 @@ func (c *Connector) Driver() driver.Driver {
 }
 
 //Ping the BigQuery service and make sure it's reachable
-func (c *conn) Ping(ctx context.Context) (err error) {
+func (c *Conn) Ping(ctx context.Context) (err error) {
 	if c.ds == nil {
 		c.ds = c.client.Dataset(c.cfg.DataSet)
 	}
@@ -137,10 +137,10 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 	return
 }
 
-func (c *conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
+func (c *Conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
 	// This is a HACK for the mocking that we have to do as the google cloud package doesn't include/use interfaces
 	// TODO: Come back if we ever can avoid the Interface hack...
-	logrus.Debugf("Got conn.Query: %s", query)
+	logrus.Debugf("Got Conn.Query: %s", query)
 	q := c.client.Query(query)
 	ctx := context.TODO()
 	var rowsIterator *bigquery.RowIterator
@@ -177,18 +177,18 @@ func (c *conn) Query(query string, args []driver.Value) (rows driver.Rows, err e
 }
 
 // Prepare is stubbed out and not used
-func (c *conn) Prepare(query string) (stmt driver.Stmt, err error) {
+func (c *Conn) Prepare(query string) (stmt driver.Stmt, err error) {
 	stmt = NewStmt(query, c)
 	return
 }
 
 //Begin  is stubbed out and not used
-func (c *conn) Begin() (driver.Tx, error) {
+func (c *Conn) Begin() (driver.Tx, error) {
 	return newTx(c)
 }
 
 //Close closes the connection
-func (c *conn) Close() (err error) {
+func (c *Conn) Close() (err error) {
 	if c.closed {
 		return nil
 	}

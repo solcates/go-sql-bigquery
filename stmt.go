@@ -7,10 +7,10 @@ import (
 
 type stmt struct {
 	query string
-	c     *conn
+	c     *Conn
 }
 
-func NewStmt(query string, c *conn) *stmt {
+func NewStmt(query string, c *Conn) *stmt {
 	return &stmt{query: query, c: c}
 }
 

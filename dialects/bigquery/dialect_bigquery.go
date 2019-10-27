@@ -1,6 +1,8 @@
 package bigquery
 
 import (
+	bigquery2 "cloud.google.com/go/bigquery"
+	"context"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
@@ -16,12 +18,30 @@ import (
 type Dialect struct {
 	db gorm.SQLCommon
 	gorm.DefaultForeignKeyNamer
-	dataset string
+	Dataset string
+	client  *bigquery2.Client
 }
 
 func init() {
-	gorm.RegisterDialect("bigquery", &Dialect{})
+	client, cfg := getClient()
+	gorm.RegisterDialect("bigquery", &Dialect{
+		Dataset: cfg.DataSet,
+		client:  client,
+	})
 
+}
+func getClient() (*bigquery2.Client, *bigquery.Config) {
+	uri := os.Getenv(bigquery.ConnectionStringEnvKey)
+
+	cfg, err := bigquery.ConfigFromConnString(uri)
+	if err != nil {
+		panic(err)
+	}
+	client, err := bigquery2.NewClient(context.TODO(), cfg.ProjectID)
+	if err != nil {
+		panic(err)
+	}
+	return client, cfg
 }
 
 func (b *Dialect) GetName() string {
@@ -39,8 +59,8 @@ func (b *Dialect) SetDB(db gorm.SQLCommon) {
 		if err != nil {
 			logrus.Panic("invalid bigquery connection string should be like bigquery://projectid/us/somedataset")
 		}
-		b.dataset = cfg.DataSet
-		defaultTableName = fmt.Sprintf("%s.%s", b.dataset, defaultTableName)
+		b.Dataset = cfg.DataSet
+		defaultTableName = fmt.Sprintf("%s.%s", b.Dataset, defaultTableName)
 		return defaultTableName
 	}
 	b.db = db
@@ -113,7 +133,7 @@ func (b Dialect) RemoveIndex(tableName string, indexName string) error {
 }
 
 func (b *Dialect) HasTable(in string) bool {
-	logrus.Debugf("Asking for Table: %s", in)
+	logrus.Debugf("HasTable| Asking for Table: %s", in)
 	b.SetDB(b.db)
 	ds := strings.Split(in, ".")
 	var tableName string
@@ -123,31 +143,16 @@ func (b *Dialect) HasTable(in string) bool {
 	case 1:
 		tableName = in
 	default:
-		panic("invalid tablename")
+		panic("HasTable| invalid tablename")
 	}
-	logrus.Debugf("Dataset: %s", b.dataset)
-	query := fmt.Sprintf("SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES where table_name = \"%s\"", b.dataset, tableName)
-	rows, err := b.db.Query(query)
-	if err != nil {
-		panic(err)
-	}
-	type Tables struct {
-		TableName string
-	}
-	if !rows.Next() {
-		logrus.Debug("Did Not Find Table")
-		return false
-	} else {
-		logrus.Debug("Found Table")
-		var data []byte
-		if err := rows.Scan(&data); err != nil {
-			panic(err)
-		}
-		logrus.Infof("Data: %s", string(data))
-		if string(data) == in {
-			return true
-		}
+	logrus.Debugf("HasTable| Dataset: %s", b.Dataset)
+	client, cfg := getClient()
 
+	d := client.Dataset(cfg.DataSet)
+	t := d.Table(tableName)
+	md, _ := t.Metadata(context.TODO())
+	if md != nil {
+		return true
 	}
 	return false
 }

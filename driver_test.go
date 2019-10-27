@@ -36,7 +36,7 @@ func TestDriver_Open(t *testing.T) {
 			args: args{
 				connectionString: testConnectionString,
 			},
-			wantC: &conn{
+			wantC: &Conn{
 				cfg: &Config{
 					Location:  "us",
 					DataSet:   "dataset1",
