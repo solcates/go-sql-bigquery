@@ -149,10 +149,14 @@ func (b *Dialect) HasTable(in string) bool {
 	logrus.Debugf("HasTable| Dataset: %s", cfg.DataSet)
 	d := client.Dataset(cfg.DataSet)
 	t := d.Table(tableName)
-	md, _ := t.Metadata(context.TODO())
+	md, err := t.Metadata(context.TODO())
+	if err != nil {
+		panic(err)
+	}
 	if md != nil {
 		return true
 	}
+
 	return false
 }
 
