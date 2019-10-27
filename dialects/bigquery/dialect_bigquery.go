@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	_ "github.com/solcates/go-sql-bigquery"
 	bigquery "github.com/solcates/go-sql-bigquery"
+	"google.golang.org/api/googleapi"
 	"os"
 	"reflect"
 	"strconv"
@@ -151,7 +152,14 @@ func (b *Dialect) HasTable(in string) bool {
 	t := d.Table(tableName)
 	md, err := t.Metadata(context.TODO())
 	if err != nil {
-		panic(err)
+		if gerr, ok := err.(*googleapi.Error); ok {
+			if gerr.Code == 404 {
+				return false
+			}
+		} else {
+			panic(err)
+		}
+
 	}
 	if md != nil {
 		return true
