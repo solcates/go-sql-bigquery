@@ -357,7 +357,23 @@ func TestDialect_HasTable(t *testing.T) {
 			},
 			args: args{
 				tableName: "table1",
-
+				args: nil,
+			},
+			want: true,
+		},  {
+			name: "OK, dataset.table",
+			fields: fields{
+				db:                     testDialect.db,
+				DefaultForeignKeyNamer: testDialect.DefaultForeignKeyNamer,
+				data:                   []byte("data_stores"),
+				cfg: &bigquery.Config{
+					ProjectID: "go-sql-bigquery",
+					Location:  "us",
+					DataSet:   "app-bigquery",
+				},
+			},
+			args: args{
+				tableName: "dataset1.table1",
 				args: nil,
 			},
 			want: true,

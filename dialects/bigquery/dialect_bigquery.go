@@ -135,7 +135,6 @@ func (b Dialect) RemoveIndex(tableName string, indexName string) error {
 
 func (b *Dialect) HasTable(in string) bool {
 	logrus.Debugf("HasTable| Asking for Table: %s", in)
-	b.SetDB(b.db)
 	ds := strings.Split(in, ".")
 	var tableName string
 	switch len(ds) {
@@ -156,7 +155,10 @@ func (b *Dialect) HasTable(in string) bool {
 			if gerr.Code == 404 {
 				return false
 			}
+			logrus.Debugf("Google Error: %s", gerr.Error())
+
 		} else {
+			logrus.Debugf("Unhandled Error from .Metadata: %s", err)
 			panic(err)
 		}
 
