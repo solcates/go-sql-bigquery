@@ -29,6 +29,9 @@ func init() {
 		cfg:    cfg,
 		client: client,
 	})
+	gorm.DefaultTableNameHandler = func(db *gorm.DB, defaultTableName string) string {
+		return fmt.Sprintf("%s.%s", cfg.DataSet, defaultTableName)
+	}
 }
 
 func getClient() (*bigquery2.Client, *bigquery.Config) {
