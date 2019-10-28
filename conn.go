@@ -4,9 +4,11 @@ import (
 	"cloud.google.com/go/bigquery"
 	"context"
 	"database/sql/driver"
+	"encoding/base64"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -63,7 +65,7 @@ type Conn struct {
 
 func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err error) {
 	if len(args) > 0 {
-		//logrus.Debugf("Preparing Query: %s ", query)
+		logrus.Debugf("Preparing Query: %s ", query)
 
 		for _, arg := range args {
 			switch arg.(type) {
@@ -73,15 +75,26 @@ func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err 
 				query = strings.Replace(query, "?", fmt.Sprintf("%d", arg), 1)
 			case time.Time:
 				t := arg.(time.Time)
-
 				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05")), 1)
+			case []byte:
+				data, ok := arg.([]byte)
+				if ok {
+					if len(data) == 0 {
+						query = strings.Replace(query, "?", "NULL", 1)
+
+					} else {
+						newdata := base64.StdEncoding.EncodeToString(data)
+						query = strings.Replace(query, "?", fmt.Sprintf("FROM_BASE64('%s')", newdata), 1)
+					}
+				}
 
 			default:
+				logrus.Debugf("unknown type: %s", reflect.TypeOf(arg).String())
 				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", arg), 1)
 			}
 
 		}
-		//logrus.Debugf("Prepared Query: %s ", query)
+		logrus.Debugf("Prepared Query: %s ", query)
 		out = query
 
 	} else {

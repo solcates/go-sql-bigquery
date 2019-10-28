@@ -29,6 +29,7 @@ func main() {
 		Size: 1,
 		Born: time.Now(),
 		Uuid: uuid.NewV4(),
+		Blob: []byte("Hello World"),
 	}
 	err = db.Save(django).Error
 	if err != nil {
@@ -42,6 +43,7 @@ type Animal struct {
 	Size int64
 	Born time.Time
 	Uuid uuid.UUID
+	Blob []byte
 }
 
 //func (a *Animal) TableName() string {

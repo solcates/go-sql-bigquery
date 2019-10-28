@@ -93,18 +93,19 @@ func (b *Dialect) DataTypeOf(field *gorm.StructField) string {
 			if _, ok := dataValue.Interface().(time.Time); ok {
 				sqlType = "TIMESTAMP"
 			}
-		case reflect.Array, reflect.Slice:
+		case reflect.Array:
+			spew.Dump(dataValue.Interface())
 			if _, ok := dataValue.Interface().(uuid.UUID); ok {
 				sqlType = "STRING"
 			}
-			spew.Dump(dataValue.Interface())
 		default:
-			logrus.Debugf("type not caught: %s", dataValue.Kind().String())
+			spew.Dump(dataValue.Interface())
 			if _, ok := dataValue.Interface().([]byte); ok {
 				sqlType = "BYTES"
 			}
 		}
 	}
+	logrus.Debugf("sqlType: %s", sqlType)
 
 	if sqlType == "" {
 		panic(fmt.Sprintf("invalid sql type %s (%s) for commonDialect", dataValue.Type().Name(), dataValue.Kind().String()))
