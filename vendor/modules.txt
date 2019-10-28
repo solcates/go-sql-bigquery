@@ -43,6 +43,8 @@ github.com/jstemmer/go-junit-report/parser
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
+# github.com/satori/go.uuid v1.2.0
+github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/stretchr/objx v0.1.1

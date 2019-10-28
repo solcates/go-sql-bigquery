@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	_ "github.com/solcates/go-sql-bigquery"
 	bigquery "github.com/solcates/go-sql-bigquery"
@@ -91,11 +92,14 @@ func (b *Dialect) DataTypeOf(field *gorm.StructField) string {
 			if _, ok := dataValue.Interface().(time.Time); ok {
 				sqlType = "TIMESTAMP"
 			}
+		case reflect.Array:
+			if _, ok := dataValue.Interface().(uuid.UUID); ok {
+				sqlType = "STRING"
+			}
 		default:
+			logrus.Debugf("type not caught: %s", dataValue.Kind().String())
 			if _, ok := dataValue.Interface().([]byte); ok {
-
 				sqlType = "BYTES"
-
 			}
 		}
 	}

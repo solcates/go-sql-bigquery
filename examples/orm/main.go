@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	bigquery "github.com/solcates/go-sql-bigquery"
 	_ "github.com/solcates/go-sql-bigquery/dialects/bigquery"
@@ -27,6 +28,7 @@ func main() {
 		Name: "Django",
 		Size: 1,
 		Born: time.Now(),
+		Uuid: uuid.NewV4(),
 	}
 	err = db.Save(django).Error
 	if err != nil {
@@ -39,4 +41,9 @@ type Animal struct {
 	Name string
 	Size int64
 	Born time.Time
+	Uuid uuid.UUID
 }
+
+//func (a *Animal) TableName() string {
+//	return "animals"
+//}
