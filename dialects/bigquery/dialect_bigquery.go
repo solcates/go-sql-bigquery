@@ -50,20 +50,6 @@ func (b *Dialect) GetName() string {
 }
 
 func (b *Dialect) SetDB(db gorm.SQLCommon) {
-	gorm.DefaultTableNameHandler = func(db *gorm.DB, defaultTableName string) string {
-		uri := os.Getenv(bigquery.ConnectionStringEnvKey)
-		if uri == "" {
-			logrus.Panicf("no connection string found in environment... required currently, set %s", bigquery.ConnectionStringEnvKey)
-		}
-		var cfg *bigquery.Config
-		cfg, err := bigquery.ConfigFromConnString(uri)
-		if err != nil {
-			logrus.Panic("invalid bigquery connection string should be like bigquery://projectid/us/somedataset")
-		}
-		b.cfg = cfg
-		defaultTableName = fmt.Sprintf("%s.%s", b.cfg.DataSet, defaultTableName)
-		return defaultTableName
-	}
 	b.db = db
 }
 
