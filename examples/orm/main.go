@@ -30,6 +30,7 @@ func main() {
 		Born: time.Now(),
 		Uuid: uuid.NewV4(),
 		Blob: []byte("Hello World"),
+		Kind: 4,
 	}
 	err = db.Save(django).Error
 	if err != nil {
@@ -39,12 +40,17 @@ func main() {
 }
 
 type Animal struct {
-	Name string
-	Size int64
-	Born time.Time
-	Uuid uuid.UUID
-	Blob []byte
+	Name       string
+	Size       int64
+	Born       time.Time
+	Blob       []byte
+	InstanceId uuid.UUID `gorm:"type:uuid"`
+	Kind       int32
+	Parent     uuid.UUID `gorm:"type:uuid"`
+	Uuid       uuid.UUID `gorm:"type:uuid"`
 }
+
+
 
 //func (a *Animal) TableName() string {
 //	return "animals"
