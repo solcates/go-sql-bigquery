@@ -4,6 +4,7 @@ import (
 	bigquery2 "cloud.google.com/go/bigquery"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -92,10 +93,11 @@ func (b *Dialect) DataTypeOf(field *gorm.StructField) string {
 			if _, ok := dataValue.Interface().(time.Time); ok {
 				sqlType = "TIMESTAMP"
 			}
-		case reflect.Array:
+		case reflect.Array, reflect.Slice:
 			if _, ok := dataValue.Interface().(uuid.UUID); ok {
 				sqlType = "STRING"
 			}
+			spew.Dump(dataValue.Interface())
 		default:
 			logrus.Debugf("type not caught: %s", dataValue.Kind().String())
 			if _, ok := dataValue.Interface().([]byte); ok {
