@@ -11,17 +11,21 @@ const (
 )
 
 type Driver struct {
-	ctx    context.Context
-	Config *Config
 }
 
 func (d *Driver) Open(connectionString string) (c driver.Conn, err error) {
-	//ctx := context.TODO()
-	if d.Config, err = ConfigFromConnString(connectionString); err != nil {
+	connector, err := d.OpenConnector(connectionString)
+	if err != nil {
 		return
 	}
+	return connector.Connect(context.Background())
+}
 
-	return NewConnector(connectionString).Connect(context.TODO())
+func (d *Driver) OpenConnector(connectionString string) (c driver.Connector, err error) {
+	if _, err := ConfigFromConnString(connectionString); err != nil { // validates connection string
+		return nil, err
+	}
+	return NewConnector(connectionString), nil
 }
 
 func init() {
