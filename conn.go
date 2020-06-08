@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 	"reflect"
 	"strings"
 	"time"
@@ -49,9 +50,11 @@ type Dataset interface {
 }
 
 type Config struct {
-	ProjectID string
-	Location  string
-	DataSet   string
+	ProjectID   string
+	Location    string
+	DatasetID   string
+	ApiKey      string
+	Credentials string
 }
 
 type Conn struct {
@@ -139,11 +142,21 @@ func NewConn(ctx context.Context, cfg *Config) (c *Conn, err error) {
 	c = &Conn{
 		cfg: cfg,
 	}
-	c.client, err = bigquery.NewClient(ctx, cfg.ProjectID)
+	if cfg.ApiKey != "" {
+		c.client, err = bigquery.NewClient(ctx, cfg.ProjectID, option.WithAPIKey(cfg.ApiKey))
+	} else if cfg.Credentials != "" {
+		credentialsJSON, _err := base64.StdEncoding.DecodeString(cfg.Credentials)
+		if _err != nil {
+			return nil, _err
+		}
+		c.client, err = bigquery.NewClient(ctx, cfg.ProjectID, option.WithCredentialsJSON([]byte(credentialsJSON)))
+	} else {
+		c.client, err = bigquery.NewClient(ctx, cfg.ProjectID)
+	}
 	if err != nil {
 		return nil, err
 	}
-	c.ds = c.client.Dataset(c.cfg.DataSet)
+	c.ds = c.client.Dataset(c.cfg.DatasetID)
 
 	return
 }
@@ -170,21 +183,22 @@ func (c *Connector) Driver() driver.Driver {
 	return &Driver{}
 }
 
-//Ping the BigQuery service and make sure it's reachable
+// Ping the BigQuery service and make sure it's reachable
 func (c *Conn) Ping(ctx context.Context) (err error) {
 	if c.ds == nil {
-		c.ds = c.client.Dataset(c.cfg.DataSet)
+		c.ds = c.client.Dataset(c.cfg.DatasetID)
 	}
 	var md *bigquery.DatasetMetadata
 	md, err = c.ds.Metadata(ctx)
 	if err != nil {
-		logrus.Debugf("Failed Ping Dataset: %s", c.cfg.DataSet)
+		logrus.Debugf("Failed Ping Dataset: %s", c.cfg.DatasetID)
 		return
 	}
 	logrus.Debugf("Successful Ping: %s", md.FullID)
 	return
 }
 
+// Deprecated: Drivers should implement QueryerContext instead.
 func (c *Conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
 	// This is a HACK for the mocking that we have to do as the google cloud package doesn't include/use interfaces
 	// TODO: Come back if we ever can avoid the Interface hack...
@@ -224,18 +238,51 @@ func (c *Conn) Query(query string, args []driver.Value) (rows driver.Rows, err e
 	return
 }
 
+func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (rows driver.Rows, err error) {
+	q := c.client.Query(query)
+	q.DefaultProjectID = c.cfg.ProjectID // allows omitting project in table reference
+	q.DefaultDatasetID = c.cfg.DatasetID // allows omitting dataset in table reference
+	rowsIterator, err := q.Read(ctx)
+	if err != nil {
+		return
+	}
+
+	bqRows := &bqRows{
+		rs: resultSet{},
+		c:  c,
+	}
+	for _, column := range rowsIterator.Schema {
+		bqRows.columns = append(bqRows.columns, column.Name)
+		bqRows.types = append(bqRows.types, fmt.Sprintf("%v", column.Type))
+	}
+	for {
+		var row []bigquery.Value
+		err := rowsIterator.Next(&row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		bqRows.rs.data = append(bqRows.rs.data, row)
+	}
+	rows = bqRows
+
+	return
+}
+
 // Prepare is stubbed out and not used
 func (c *Conn) Prepare(query string) (stmt driver.Stmt, err error) {
 	stmt = NewStmt(query, c)
 	return
 }
 
-//Begin  is stubbed out and not used
+// Begin  is stubbed out and not used
 func (c *Conn) Begin() (driver.Tx, error) {
 	return newTx(c)
 }
 
-//Close closes the connection
+// Close closes the connection
 func (c *Conn) Close() (err error) {
 	if c.closed {
 		return nil
