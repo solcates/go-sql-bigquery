@@ -13,6 +13,7 @@ type resultSet struct {
 
 type bqRows struct {
 	columns []string
+	types   []string
 	rs      resultSet
 	c       *Conn
 }
@@ -29,7 +30,13 @@ func (b *bqRows) Next(dest []driver.Value) error {
 	if b.rs.num == len(b.rs.data) {
 		return io.EOF
 	}
-	dest[0] = b.rs.data[b.rs.num]
+	for i, bgValue := range b.rs.data[b.rs.num] {
+		dest[i] = bgValue
+	}
 	b.rs.num++
 	return nil
+}
+
+func (b *bqRows) ColumnTypeDatabaseTypeName(index int) string {
+	return b.types[index]
 }
