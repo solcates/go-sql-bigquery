@@ -33,7 +33,7 @@ func init() {
 		panic("Can not setup connections to Google Cloud... Check credentials, and connection string")
 	}
 
-	ds := testConn.client.Dataset(testConfig.DataSet)
+	ds := testConn.client.Dataset(testConfig.DatasetID)
 	_, err = ds.Metadata(ctx)
 	if err != nil {
 		panic("Can not get dataset, check your connection string, permissions, and that it exists in your project")
@@ -86,7 +86,7 @@ func setupConnections() (err error) {
 	}
 	testClient, err = bigquery.NewClient(ctx, testConfig.ProjectID)
 	testConn.projectID = testConfig.ProjectID
-	testConn.ds = testClient.Dataset(testConfig.DataSet)
+	testConn.ds = testClient.Dataset(testConfig.DatasetID)
 	testMockDataset = &mockDataset{}
 	return
 }
@@ -123,7 +123,7 @@ func TestConfigFromConnString(t *testing.T) {
 
 			wantCfg: &Config{
 				Location:  "us",
-				DataSet:   "dataset1",
+				DatasetID: "dataset1",
 				ProjectID: "projectid",
 			},
 			wantErr: false,
@@ -292,7 +292,7 @@ func TestConnector_Connect(t *testing.T) {
 				client: testClient,
 				ds: &bigquery.Dataset{
 					ProjectID: testConfig.ProjectID,
-					DatasetID: testConfig.DataSet,
+					DatasetID: testConfig.DatasetID,
 				},
 				projectID: testConfig.ProjectID,
 				bad:       false,
@@ -544,7 +544,7 @@ func TestConn_Ping(t *testing.T) {
 					Location: "us",
 				},
 				ds:        testMockDataset,
-				projectID: testConfig.DataSet,
+				projectID: testConfig.ProjectID,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -684,7 +684,7 @@ type mockDataset struct {
 
 func (m *mockDataset) Metadata(ctx context.Context) (md *bigquery.DatasetMetadata, err error) {
 	return &bigquery.DatasetMetadata{
-		Name:     m.config.DataSet,
+		Name:     m.config.DatasetID,
 		Location: m.config.Location,
 	}, nil
 }

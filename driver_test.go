@@ -39,7 +39,7 @@ func TestDriver_Open(t *testing.T) {
 			wantC: &Conn{
 				cfg: &Config{
 					Location:  "us",
-					DataSet:   "dataset1",
+					DatasetID: "dataset1",
 					ProjectID: "projectid",
 				},
 			},
