@@ -66,34 +66,43 @@ type Conn struct {
 	closed    bool
 }
 
-func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err error) {
+func namedValueToValue(named []driver.NamedValue) ([]driver.Value, error) {
+	args := make([]driver.Value, len(named))
+	for n, param := range named {
+		if len(param.Name) > 0 {
+			return nil, fmt.Errorf("driver does not support the use of Named Parameters")
+		}
+		args[n] = param.Value
+	}
+	return args, nil
+}
+
+func prepareQuery(query string, args []driver.Value) (out string, err error) {
 	if len(args) > 0 {
 		logrus.Debugf("Preparing Query: %s ", query)
 
 		for _, arg := range args {
-			switch arg.(type) {
+			switch value := arg.(type) {
 			case string:
-				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", arg), 1)
+				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", value), 1)
 			case int, int64, int8, int32, int16:
-				query = strings.Replace(query, "?", fmt.Sprintf("%d", arg), 1)
+				query = strings.Replace(query, "?", fmt.Sprintf("%d", value), 1)
+			case float32, float64:
+				query = strings.Replace(query, "?", fmt.Sprintf("%f", value), 1)
 			case time.Time:
-				t := arg.(time.Time)
-				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05")), 1)
+				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", value.Format("2006-01-02T15:04:05Z07:00")), 1)
+			case bool:
+				query = strings.Replace(query, "?", fmt.Sprintf("%t", value), 1)
 			case []byte:
-				data, ok := arg.([]byte)
-				if ok {
-					if len(data) == 0 {
-						query = strings.Replace(query, "?", "NULL", 1)
-
-					} else {
-						newdata := base64.StdEncoding.EncodeToString(data)
-						query = strings.Replace(query, "?", fmt.Sprintf("FROM_BASE64('%s')", newdata), 1)
-					}
+				if len(value) == 0 {
+					query = strings.Replace(query, "?", "NULL", 1)
+				} else {
+					data64 := base64.StdEncoding.EncodeToString(value)
+					query = strings.Replace(query, "?", fmt.Sprintf("FROM_BASE64('%s')", data64), 1)
 				}
-
 			default:
-				logrus.Debugf("unknown type: %s", reflect.TypeOf(arg).String())
-				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", arg), 1)
+				logrus.Debugf("unknown type: %s", reflect.TypeOf(value).String())
+				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", value), 1)
 			}
 
 		}
@@ -106,9 +115,10 @@ func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err 
 	return
 }
 
+// Deprecated: Drivers should implement ExecerContext instead.
 func (c *Conn) Exec(query string, args []driver.Value) (res driver.Result, err error) {
 	logrus.Debugf("Got Conn.Exec: %s", query)
-	if query, err = c.prepareQuery(query, args); err != nil {
+	if query, err = prepareQuery(query, args); err != nil {
 		return
 	}
 	ctx := context.TODO()
@@ -135,6 +145,42 @@ func (c *Conn) Exec(query string, args []driver.Value) (res driver.Result, err e
 	logrus.Debugf("Results for Conn.Exec: %s", data)
 
 	return
+}
+
+func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	xargs, err := namedValueToValue(args)
+	if err != nil {
+		return nil, err
+	}
+	if query, err = prepareQuery(query, xargs); err != nil {
+		return nil, err
+	}
+
+	q := c.client.Query(query)
+	q.DefaultProjectID = c.cfg.ProjectID // allows omitting project in table reference
+	q.DefaultDatasetID = c.cfg.DatasetID // allows omitting dataset in table reference
+	it, err := q.Read(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	//var data [][]bigquery.Value
+	for {
+		var row []bigquery.Value
+		err := it.Next(&row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		//data = append(data, row)
+	}
+	res := &result{
+		rowsAffected: int64(it.TotalRows),
+	}
+
+	return res, nil
 }
 
 // NewConn returns a connection for this Config
@@ -238,22 +284,22 @@ func (c *Conn) Query(query string, args []driver.Value) (rows driver.Rows, err e
 	return
 }
 
-func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (rows driver.Rows, err error) {
+func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	q := c.client.Query(query)
 	q.DefaultProjectID = c.cfg.ProjectID // allows omitting project in table reference
 	q.DefaultDatasetID = c.cfg.DatasetID // allows omitting dataset in table reference
 	rowsIterator, err := q.Read(ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	bqRows := &bqRows{
+	res := &bqRows{
 		rs: resultSet{},
 		c:  c,
 	}
 	for _, column := range rowsIterator.Schema {
-		bqRows.columns = append(bqRows.columns, column.Name)
-		bqRows.types = append(bqRows.types, fmt.Sprintf("%v", column.Type))
+		res.columns = append(res.columns, column.Name)
+		res.types = append(res.types, fmt.Sprintf("%v", column.Type))
 	}
 	for {
 		var row []bigquery.Value
@@ -264,11 +310,10 @@ func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, err
 		}
-		bqRows.rs.data = append(bqRows.rs.data, row)
+		res.rs.data = append(res.rs.data, row)
 	}
-	rows = bqRows
 
-	return
+	return res, nil
 }
 
 // Prepare is stubbed out and not used
