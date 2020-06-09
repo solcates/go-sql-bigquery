@@ -633,9 +633,7 @@ func TestConn_prepareQuery(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := testConn
-
-			gotOut, err := c.prepareQuery(tt.args.query, tt.args.args)
+			gotOut, err := prepareQuery(tt.args.query, tt.args.args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("prepareQuery() error = %v, wantErr %v", err, tt.wantErr)
 				return
