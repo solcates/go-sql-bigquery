@@ -117,42 +117,19 @@ func prepareQuery(query string, args []driver.Value) (out string, err error) {
 
 // Deprecated: Drivers should implement ExecerContext instead.
 func (c *Conn) Exec(query string, args []driver.Value) (res driver.Result, err error) {
-	logrus.Debugf("Got Conn.Exec: %s", query)
-	if query, err = prepareQuery(query, args); err != nil {
-		return
-	}
-	ctx := context.TODO()
-	q := c.client.Query(query)
-	it, err := q.Read(ctx)
-	if err != nil {
-		return
-	}
-	var data [][]bigquery.Value
-	for {
-		var row []bigquery.Value
-		err := it.Next(&row)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, row)
-	}
-	res = &result{
-		rowsAffected: int64(it.TotalRows),
-	}
-	logrus.Debugf("Results for Conn.Exec: %s", data)
-
-	return
+	return c.execContext(context.Background(), query, args)
 }
 
 func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	xargs, err := namedValueToValue(args)
+	_args, err := namedValueToValue(args)
 	if err != nil {
 		return nil, err
 	}
-	if query, err = prepareQuery(query, xargs); err != nil {
+	return c.execContext(ctx, query, _args)
+}
+
+func (c *Conn) execContext(ctx context.Context, query string, args []driver.Value) (res driver.Result, err error) {
+	if query, err = prepareQuery(query, args); err != nil {
 		return nil, err
 	}
 
@@ -164,6 +141,7 @@ func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		return nil, err
 	}
 
+	// TODO: were data any useful?
 	//var data [][]bigquery.Value
 	for {
 		var row []bigquery.Value
@@ -176,11 +154,11 @@ func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		}
 		//data = append(data, row)
 	}
-	res := &result{
+	res = &result{
 		rowsAffected: int64(it.TotalRows),
 	}
 
-	return res, nil
+	return
 }
 
 // NewConn returns a connection for this Config
@@ -246,45 +224,18 @@ func (c *Conn) Ping(ctx context.Context) (err error) {
 
 // Deprecated: Drivers should implement QueryerContext instead.
 func (c *Conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
-	// This is a HACK for the mocking that we have to do as the google cloud package doesn't include/use interfaces
-	// TODO: Come back if we ever can avoid the Interface hack...
-	logrus.Debugf("Got Conn.Query: %s", query)
-	q := c.client.Query(query)
-	ctx := context.TODO()
-	var rowsIterator *bigquery.RowIterator
-	rowsIterator, err = q.Read(ctx)
-	if err != nil {
-		return
-	}
-
-	bqrows := &bqRows{
-		columns: nil,
-		rs:      resultSet{},
-		c:       c,
-	}
-
-	for {
-		var row []bigquery.Value
-		err := rowsIterator.Next(&row)
-		if bqrows.columns == nil {
-
-			for _, column := range rowsIterator.Schema {
-				bqrows.columns = append(bqrows.columns, column.Name)
-			}
-		}
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		bqrows.rs.data = append(bqrows.rs.data, row)
-	}
-	rows = bqrows
-	return
+	return c.queryContext(context.Background(), query, args)
 }
 
 func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	_args, err := namedValueToValue(args)
+	if err != nil {
+		return nil, err
+	}
+	return c.queryContext(ctx, query, _args)
+}
+
+func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
 	q := c.client.Query(query)
 	q.DefaultProjectID = c.cfg.ProjectID // allows omitting project in table reference
 	q.DefaultDatasetID = c.cfg.DatasetID // allows omitting dataset in table reference

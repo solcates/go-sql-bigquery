@@ -224,6 +224,7 @@ func TestConn_Query(t *testing.T) {
 			},
 			wantRows: &bqRows{
 				columns: []string{"name", "number"},
+				types: []string{"STRING", "INTEGER"},
 				rs: resultSet{
 					data: [][]bigquery.Value{
 						{"hello", int64(1)},
