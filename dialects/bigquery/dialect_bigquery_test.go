@@ -70,7 +70,7 @@ func setupDialectTests(t testing.TB) func(t testing.TB) {
 	testDialect.cfg = &bigquery.Config{
 		ProjectID: "go-sql-binary",
 		Location:  "us",
-		DataSet:   "dataset1",
+		DatasetID: "dataset1",
 	}
 	return func(t testing.TB) {
 
@@ -334,7 +334,7 @@ func TestDialect_HasTable(t *testing.T) {
 				cfg: &bigquery.Config{
 					ProjectID: "go-sql-bigquery",
 					Location:  "us",
-					DataSet:   "dataset1",
+					DatasetID: "dataset1",
 				},
 			},
 			args: args{
@@ -352,7 +352,7 @@ func TestDialect_HasTable(t *testing.T) {
 				cfg: &bigquery.Config{
 					ProjectID: "go-sql-bigquery",
 					Location:  "us",
-					DataSet:   "app-bigquery",
+					DatasetID:  "app-bigquery",
 				},
 			},
 			args: args{
@@ -369,7 +369,7 @@ func TestDialect_HasTable(t *testing.T) {
 				cfg: &bigquery.Config{
 					ProjectID: "go-sql-bigquery",
 					Location:  "us",
-					DataSet:   "app-bigquery",
+					DatasetID: "app-bigquery",
 				},
 			},
 			args: args{
@@ -386,7 +386,7 @@ func TestDialect_HasTable(t *testing.T) {
 				cfg: &bigquery.Config{
 					ProjectID: "go-sql-bigquery",
 					Location:  "us",
-					DataSet:   "dataset1",
+					DatasetID: "dataset1",
 				},
 			},
 			args: args{

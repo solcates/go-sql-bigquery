@@ -33,7 +33,7 @@ func init() {
 		client: client,
 	})
 	gorm.DefaultTableNameHandler = func(db *gorm.DB, defaultTableName string) string {
-		return fmt.Sprintf("%s.%s", cfg.DataSet, defaultTableName)
+		return fmt.Sprintf("%s.%s", cfg.DatasetID, defaultTableName)
 	}
 }
 
@@ -145,8 +145,8 @@ func (b *Dialect) HasTable(in string) bool {
 		panic("HasTable| invalid tablename")
 	}
 	client, cfg := getClient()
-	logrus.Debugf("HasTable| Dataset: %s", cfg.DataSet)
-	d := client.Dataset(cfg.DataSet)
+	logrus.Debugf("HasTable| Dataset: %s", cfg.DatasetID)
+	d := client.Dataset(cfg.DatasetID)
 	t := d.Table(tableName)
 	md, err := t.Metadata(context.TODO())
 	if err != nil {

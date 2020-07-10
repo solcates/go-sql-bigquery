@@ -2,24 +2,31 @@ package bigquery
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
 // ConfigFromConnString will return the Config structures
 func ConfigFromConnString(in string) (*Config, error) {
-	// Expects format to be bigquery://projectid/location/dataset   that's IT!
-	// anything else will fail
 	cfg := &Config{}
 	if strings.HasPrefix(in, "bigquery://") {
-		in = strings.ToLower(in)
-		path := strings.TrimPrefix(in, "bigquery://")
-		fields := strings.Split(path, "/")
-		if len(fields) != 3 {
-			return nil, fmt.Errorf("invalid connection string : %s", in)
+		u, err := url.Parse(in)
+		if err != nil {
+			return nil, fmt.Errorf("invalid connection string: %s (%s)", in, err.Error())
 		}
-		cfg.ProjectID = fields[0]
-		cfg.Location = fields[1]
-		cfg.DataSet = fields[2]
+		v, err := url.ParseQuery(u.RawQuery)
+		if err != nil {
+			return nil, fmt.Errorf("invalid connection string: %s (%s)", in, err.Error())
+		}
+		fields := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+		if len(fields) != 2 {
+			return nil, fmt.Errorf("invalid connection string: %s", in)
+		}
+		cfg.ProjectID = u.Host
+		cfg.Location = fields[0]
+		cfg.DatasetID = fields[1]
+		cfg.ApiKey = v.Get("apiKey")
+		cfg.Credentials = v.Get("credentials")
 		return cfg, nil
 	} else {
 		// Nope, bad prefix

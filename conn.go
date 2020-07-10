@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 	"reflect"
 	"strings"
 	"time"
@@ -49,9 +50,11 @@ type Dataset interface {
 }
 
 type Config struct {
-	ProjectID string
-	Location  string
-	DataSet   string
+	ProjectID   string
+	Location    string
+	DatasetID   string
+	ApiKey      string
+	Credentials string
 }
 
 type Conn struct {
@@ -63,34 +66,43 @@ type Conn struct {
 	closed    bool
 }
 
-func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err error) {
+func namedValueToValue(named []driver.NamedValue) ([]driver.Value, error) {
+	args := make([]driver.Value, len(named))
+	for n, param := range named {
+		if len(param.Name) > 0 {
+			return nil, fmt.Errorf("driver does not support the use of Named Parameters")
+		}
+		args[n] = param.Value
+	}
+	return args, nil
+}
+
+func prepareQuery(query string, args []driver.Value) (out string, err error) {
 	if len(args) > 0 {
 		logrus.Debugf("Preparing Query: %s ", query)
 
 		for _, arg := range args {
-			switch arg.(type) {
+			switch value := arg.(type) {
 			case string:
-				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", arg), 1)
+				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", value), 1)
 			case int, int64, int8, int32, int16:
-				query = strings.Replace(query, "?", fmt.Sprintf("%d", arg), 1)
+				query = strings.Replace(query, "?", fmt.Sprintf("%d", value), 1)
+			case float32, float64:
+				query = strings.Replace(query, "?", fmt.Sprintf("%f", value), 1)
 			case time.Time:
-				t := arg.(time.Time)
-				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", t.Format("2006-01-02 15:04:05")), 1)
+				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", value.Format("2006-01-02T15:04:05Z07:00")), 1)
+			case bool:
+				query = strings.Replace(query, "?", fmt.Sprintf("%t", value), 1)
 			case []byte:
-				data, ok := arg.([]byte)
-				if ok {
-					if len(data) == 0 {
-						query = strings.Replace(query, "?", "NULL", 1)
-
-					} else {
-						newdata := base64.StdEncoding.EncodeToString(data)
-						query = strings.Replace(query, "?", fmt.Sprintf("FROM_BASE64('%s')", newdata), 1)
-					}
+				if len(value) == 0 {
+					query = strings.Replace(query, "?", "NULL", 1)
+				} else {
+					data64 := base64.StdEncoding.EncodeToString(value)
+					query = strings.Replace(query, "?", fmt.Sprintf("FROM_BASE64('%s')", data64), 1)
 				}
-
 			default:
-				logrus.Debugf("unknown type: %s", reflect.TypeOf(arg).String())
-				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", arg), 1)
+				logrus.Debugf("unknown type: %s", reflect.TypeOf(value).String())
+				query = strings.Replace(query, "?", fmt.Sprintf("'%s'", value), 1)
 			}
 
 		}
@@ -103,18 +115,34 @@ func (c *Conn) prepareQuery(query string, args []driver.Value) (out string, err 
 	return
 }
 
+// Deprecated: Drivers should implement ExecerContext instead.
 func (c *Conn) Exec(query string, args []driver.Value) (res driver.Result, err error) {
-	logrus.Debugf("Got Conn.Exec: %s", query)
-	if query, err = c.prepareQuery(query, args); err != nil {
-		return
+	return c.execContext(context.Background(), query, args)
+}
+
+func (c *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	_args, err := namedValueToValue(args)
+	if err != nil {
+		return nil, err
 	}
-	ctx := context.TODO()
+	return c.execContext(ctx, query, _args)
+}
+
+func (c *Conn) execContext(ctx context.Context, query string, args []driver.Value) (res driver.Result, err error) {
+	if query, err = prepareQuery(query, args); err != nil {
+		return nil, err
+	}
+
 	q := c.client.Query(query)
+	q.DefaultProjectID = c.cfg.ProjectID // allows omitting project in table reference
+	q.DefaultDatasetID = c.cfg.DatasetID // allows omitting dataset in table reference
 	it, err := q.Read(ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
-	var data [][]bigquery.Value
+
+	// TODO: were data any useful?
+	//var data [][]bigquery.Value
 	for {
 		var row []bigquery.Value
 		err := it.Next(&row)
@@ -124,12 +152,11 @@ func (c *Conn) Exec(query string, args []driver.Value) (res driver.Result, err e
 		if err != nil {
 			return nil, err
 		}
-		data = append(data, row)
+		//data = append(data, row)
 	}
 	res = &result{
 		rowsAffected: int64(it.TotalRows),
 	}
-	logrus.Debugf("Results for Conn.Exec: %s", data)
 
 	return
 }
@@ -139,11 +166,21 @@ func NewConn(ctx context.Context, cfg *Config) (c *Conn, err error) {
 	c = &Conn{
 		cfg: cfg,
 	}
-	c.client, err = bigquery.NewClient(ctx, cfg.ProjectID)
+	if cfg.ApiKey != "" {
+		c.client, err = bigquery.NewClient(ctx, cfg.ProjectID, option.WithAPIKey(cfg.ApiKey))
+	} else if cfg.Credentials != "" {
+		credentialsJSON, _err := base64.StdEncoding.DecodeString(cfg.Credentials)
+		if _err != nil {
+			return nil, _err
+		}
+		c.client, err = bigquery.NewClient(ctx, cfg.ProjectID, option.WithCredentialsJSON([]byte(credentialsJSON)))
+	} else {
+		c.client, err = bigquery.NewClient(ctx, cfg.ProjectID)
+	}
 	if err != nil {
 		return nil, err
 	}
-	c.ds = c.client.Dataset(c.cfg.DataSet)
+	c.ds = c.client.Dataset(c.cfg.DatasetID)
 
 	return
 }
@@ -170,58 +207,64 @@ func (c *Connector) Driver() driver.Driver {
 	return &Driver{}
 }
 
-//Ping the BigQuery service and make sure it's reachable
+// Ping the BigQuery service and make sure it's reachable
 func (c *Conn) Ping(ctx context.Context) (err error) {
 	if c.ds == nil {
-		c.ds = c.client.Dataset(c.cfg.DataSet)
+		c.ds = c.client.Dataset(c.cfg.DatasetID)
 	}
 	var md *bigquery.DatasetMetadata
 	md, err = c.ds.Metadata(ctx)
 	if err != nil {
-		logrus.Debugf("Failed Ping Dataset: %s", c.cfg.DataSet)
+		logrus.Debugf("Failed Ping Dataset: %s", c.cfg.DatasetID)
 		return
 	}
 	logrus.Debugf("Successful Ping: %s", md.FullID)
 	return
 }
 
+// Deprecated: Drivers should implement QueryerContext instead.
 func (c *Conn) Query(query string, args []driver.Value) (rows driver.Rows, err error) {
-	// This is a HACK for the mocking that we have to do as the google cloud package doesn't include/use interfaces
-	// TODO: Come back if we ever can avoid the Interface hack...
-	logrus.Debugf("Got Conn.Query: %s", query)
-	q := c.client.Query(query)
-	ctx := context.TODO()
-	var rowsIterator *bigquery.RowIterator
-	rowsIterator, err = q.Read(ctx)
+	return c.queryContext(context.Background(), query, args)
+}
+
+func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	_args, err := namedValueToValue(args)
 	if err != nil {
-		return
+		return nil, err
+	}
+	return c.queryContext(ctx, query, _args)
+}
+
+func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
+	q := c.client.Query(query)
+	q.DefaultProjectID = c.cfg.ProjectID // allows omitting project in table reference
+	q.DefaultDatasetID = c.cfg.DatasetID // allows omitting dataset in table reference
+	rowsIterator, err := q.Read(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	bqrows := &bqRows{
-		columns: nil,
-		rs:      resultSet{},
-		c:       c,
+	res := &bqRows{
+		rs: resultSet{},
+		c:  c,
 	}
-
+	for _, column := range rowsIterator.Schema {
+		res.columns = append(res.columns, column.Name)
+		res.types = append(res.types, fmt.Sprintf("%v", column.Type))
+	}
 	for {
 		var row []bigquery.Value
 		err := rowsIterator.Next(&row)
-		if bqrows.columns == nil {
-
-			for _, column := range rowsIterator.Schema {
-				bqrows.columns = append(bqrows.columns, column.Name)
-			}
-		}
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
 			return nil, err
 		}
-		bqrows.rs.data = append(bqrows.rs.data, row)
+		res.rs.data = append(res.rs.data, row)
 	}
-	rows = bqrows
-	return
+
+	return res, nil
 }
 
 // Prepare is stubbed out and not used
@@ -230,12 +273,12 @@ func (c *Conn) Prepare(query string) (stmt driver.Stmt, err error) {
 	return
 }
 
-//Begin  is stubbed out and not used
+// Begin  is stubbed out and not used
 func (c *Conn) Begin() (driver.Tx, error) {
 	return newTx(c)
 }
 
-//Close closes the connection
+// Close closes the connection
 func (c *Conn) Close() (err error) {
 	if c.closed {
 		return nil
