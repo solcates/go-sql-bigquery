@@ -4,8 +4,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	bigquery "github.com/solcates/go-sql-bigquery"
-	_ "github.com/solcates/go-sql-bigquery/dialects/bigquery"
+	bigquery "github.com/HeliosData/go-sql-bigquery"
+	_ "github.com/HeliosData/go-sql-bigquery/dialects/bigquery"
 	"os"
 	"time"
 )

@@ -6,7 +6,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
-	bigquery "github.com/solcates/go-sql-bigquery"
+	bigquery "github.com/HeliosData/go-sql-bigquery"
 	"github.com/stretchr/testify/mock"
 	"testing"
 )

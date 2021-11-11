@@ -32,7 +32,7 @@ package main
 
 import (
     "database/sql"
-    _ "github.com/solcates/go-sql-bigquery"
+    _ "github.com/HeliosData/go-sql-bigquery"
     "log"
 )
 
@@ -57,7 +57,7 @@ package main
 
 import (
     "github.com/jinzhu/gorm"
-    _ "github.com/solcates/go-sql-bigquery/dialects/bigquery"
+    _ "github.com/HeliosData/go-sql-bigquery/dialects/bigquery"
     "log"
 )
 
