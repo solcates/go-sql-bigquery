@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC.
+// Copyright 2021 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -58,6 +58,7 @@ import (
 	googleapi "google.golang.org/api/googleapi"
 	gensupport "google.golang.org/api/internal/gensupport"
 	option "google.golang.org/api/option"
+	internaloption "google.golang.org/api/option/internaloption"
 	htransport "google.golang.org/api/transport/http"
 )
 
@@ -74,11 +75,13 @@ var _ = googleapi.Version
 var _ = errors.New
 var _ = strings.Replace
 var _ = context.Canceled
+var _ = internaloption.WithDefaultEndpoint
 
 const apiId = "bigquery:v2"
 const apiName = "bigquery"
 const apiVersion = "v2"
 const basePath = "https://bigquery.googleapis.com/bigquery/v2/"
+const mtlsBasePath = "https://bigquery.mtls.googleapis.com/bigquery/v2/"
 
 // OAuth2 scopes used by this API.
 const (
@@ -91,7 +94,7 @@ const (
 	// View your data in Google BigQuery
 	BigqueryReadonlyScope = "https://www.googleapis.com/auth/bigquery.readonly"
 
-	// View and manage your data across Google Cloud Platform services
+	// See, edit, configure, and delete your Google Cloud Platform data
 	CloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
 
 	// View your data across Google Cloud Platform services
@@ -121,6 +124,8 @@ func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, err
 	)
 	// NOTE: prepend, so we don't override user-specified scopes.
 	opts = append([]option.ClientOption{scopesOption}, opts...)
+	opts = append(opts, internaloption.WithDefaultEndpoint(basePath))
+	opts = append(opts, internaloption.WithDefaultMTLSEndpoint(mtlsBasePath))
 	client, endpoint, err := htransport.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, err
@@ -150,6 +155,7 @@ func New(client *http.Client) (*Service, error) {
 	s.Models = NewModelsService(s)
 	s.Projects = NewProjectsService(s)
 	s.Routines = NewRoutinesService(s)
+	s.RowAccessPolicies = NewRowAccessPoliciesService(s)
 	s.Tabledata = NewTabledataService(s)
 	s.Tables = NewTablesService(s)
 	return s, nil
@@ -169,6 +175,8 @@ type Service struct {
 	Projects *ProjectsService
 
 	Routines *RoutinesService
+
+	RowAccessPolicies *RowAccessPoliciesService
 
 	Tabledata *TabledataService
 
@@ -227,6 +235,15 @@ type RoutinesService struct {
 	s *Service
 }
 
+func NewRowAccessPoliciesService(s *Service) *RowAccessPoliciesService {
+	rs := &RowAccessPoliciesService{s: s}
+	return rs
+}
+
+type RowAccessPoliciesService struct {
+	s *Service
+}
+
 func NewTabledataService(s *Service) *TabledataService {
 	rs := &TabledataService{s: s}
 	return rs
@@ -246,25 +263,19 @@ type TablesService struct {
 }
 
 // AggregateClassificationMetrics: Aggregate metrics for
-// classification/classifier models. For multi-class
-// models, the metrics are either macro-averaged or micro-averaged.
-// When
-// macro-averaged, the metrics are calculated for each label and then
-// an
-// unweighted average is taken of those values. When micro-averaged,
-// the
-// metric is calculated globally by counting the total number of
-// correctly
+// classification/classifier models. For multi-class models, the metrics
+// are either macro-averaged or micro-averaged. When macro-averaged, the
+// metrics are calculated for each label and then an unweighted average
+// is taken of those values. When micro-averaged, the metric is
+// calculated globally by counting the total number of correctly
 // predicted rows.
 type AggregateClassificationMetrics struct {
 	// Accuracy: Accuracy is the fraction of predictions given the correct
-	// label. For
-	// multiclass this is a micro-averaged metric.
+	// label. For multiclass this is a micro-averaged metric.
 	Accuracy float64 `json:"accuracy,omitempty"`
 
 	// F1Score: The F1 score is an average of recall and precision. For
-	// multiclass
-	// this is a macro-averaged metric.
+	// multiclass this is a macro-averaged metric.
 	F1Score float64 `json:"f1Score,omitempty"`
 
 	// LogLoss: Logarithmic Loss. For multiclass this is a macro-averaged
@@ -272,28 +283,22 @@ type AggregateClassificationMetrics struct {
 	LogLoss float64 `json:"logLoss,omitempty"`
 
 	// Precision: Precision is the fraction of actual positive predictions
-	// that had
-	// positive actual labels. For multiclass this is a
-	// macro-averaged
-	// metric treating each class as a binary classifier.
+	// that had positive actual labels. For multiclass this is a
+	// macro-averaged metric treating each class as a binary classifier.
 	Precision float64 `json:"precision,omitempty"`
 
 	// Recall: Recall is the fraction of actual positive labels that were
-	// given a
-	// positive prediction. For multiclass this is a macro-averaged metric.
+	// given a positive prediction. For multiclass this is a macro-averaged
+	// metric.
 	Recall float64 `json:"recall,omitempty"`
 
 	// RocAuc: Area Under a ROC Curve. For multiclass this is a
-	// macro-averaged
-	// metric.
+	// macro-averaged metric.
 	RocAuc float64 `json:"rocAuc,omitempty"`
 
-	// Threshold: Threshold at which the metrics are computed. For
-	// binary
-	// classification models this is the positive class threshold.
-	// For multi-class classfication models this is the
-	// confidence
-	// threshold.
+	// Threshold: Threshold at which the metrics are computed. For binary
+	// classification models this is the positive class threshold. For
+	// multi-class classfication models this is the confidence threshold.
 	Threshold float64 `json:"threshold,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Accuracy") to
@@ -352,18 +357,15 @@ type Argument struct {
 	// Possible values:
 	//   "ARGUMENT_KIND_UNSPECIFIED"
 	//   "FIXED_TYPE" - The argument is a variable with fully specified
-	// type, which can be a
-	// struct or an array, but not a table.
+	// type, which can be a struct or an array, but not a table.
 	//   "ANY_TYPE" - The argument is any type, including struct or array,
-	// but not a table.
-	// To be added: FIXED_TABLE, ANY_TABLE
+	// but not a table. To be added: FIXED_TABLE, ANY_TABLE
 	ArgumentKind string `json:"argumentKind,omitempty"`
 
 	// DataType: Required unless argument_kind = ANY_TYPE.
 	DataType *StandardSqlDataType `json:"dataType,omitempty"`
 
-	// Mode: Optional. Specifies whether the argument is input or
-	// output.
+	// Mode: Optional. Specifies whether the argument is input or output.
 	// Can be set for procedures only.
 	//
 	// Possible values:
@@ -455,13 +457,13 @@ func (s *ArimaCoefficients) UnmarshalJSON(data []byte) error {
 
 // ArimaFittingMetrics: ARIMA model fitting metrics.
 type ArimaFittingMetrics struct {
-	// Aic: AIC
+	// Aic: AIC.
 	Aic float64 `json:"aic,omitempty"`
 
-	// LogLikelihood: log-likelihood
+	// LogLikelihood: Log-likelihood.
 	LogLikelihood float64 `json:"logLikelihood,omitempty"`
 
-	// Variance: variance.
+	// Variance: Variance.
 	Variance float64 `json:"variance,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Aic") to
@@ -505,6 +507,65 @@ func (s *ArimaFittingMetrics) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ArimaForecastingMetrics: Model evaluation metrics for ARIMA
+// forecasting models.
+type ArimaForecastingMetrics struct {
+	// ArimaFittingMetrics: Arima model fitting metrics.
+	ArimaFittingMetrics []*ArimaFittingMetrics `json:"arimaFittingMetrics,omitempty"`
+
+	// ArimaSingleModelForecastingMetrics: Repeated as there can be many
+	// metric sets (one for each model) in auto-arima and the large-scale
+	// case.
+	ArimaSingleModelForecastingMetrics []*ArimaSingleModelForecastingMetrics `json:"arimaSingleModelForecastingMetrics,omitempty"`
+
+	// HasDrift: Whether Arima model fitted with drift or not. It is always
+	// false when d is not 1.
+	HasDrift []bool `json:"hasDrift,omitempty"`
+
+	// NonSeasonalOrder: Non-seasonal order.
+	NonSeasonalOrder []*ArimaOrder `json:"nonSeasonalOrder,omitempty"`
+
+	// SeasonalPeriods: Seasonal periods. Repeated because multiple periods
+	// are supported for one time series.
+	//
+	// Possible values:
+	//   "SEASONAL_PERIOD_TYPE_UNSPECIFIED"
+	//   "NO_SEASONALITY" - No seasonality
+	//   "DAILY" - Daily period, 24 hours.
+	//   "WEEKLY" - Weekly period, 7 days.
+	//   "MONTHLY" - Monthly period, 30 days or irregular.
+	//   "QUARTERLY" - Quarterly period, 90 days or irregular.
+	//   "YEARLY" - Yearly period, 365 days or irregular.
+	SeasonalPeriods []string `json:"seasonalPeriods,omitempty"`
+
+	// TimeSeriesId: Id to differentiate different time series for the
+	// large-scale case.
+	TimeSeriesId []string `json:"timeSeriesId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ArimaFittingMetrics")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ArimaFittingMetrics") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ArimaForecastingMetrics) MarshalJSON() ([]byte, error) {
+	type NoMethod ArimaForecastingMetrics
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ArimaModelInfo: Arima model information.
 type ArimaModelInfo struct {
 	// ArimaCoefficients: Arima coefficients.
@@ -513,8 +574,31 @@ type ArimaModelInfo struct {
 	// ArimaFittingMetrics: Arima fitting metrics.
 	ArimaFittingMetrics *ArimaFittingMetrics `json:"arimaFittingMetrics,omitempty"`
 
+	// HasDrift: Whether Arima model fitted with drift or not. It is always
+	// false when d is not 1.
+	HasDrift bool `json:"hasDrift,omitempty"`
+
 	// NonSeasonalOrder: Non-seasonal order.
 	NonSeasonalOrder *ArimaOrder `json:"nonSeasonalOrder,omitempty"`
+
+	// SeasonalPeriods: Seasonal periods. Repeated because multiple periods
+	// are supported for one time series.
+	//
+	// Possible values:
+	//   "SEASONAL_PERIOD_TYPE_UNSPECIFIED"
+	//   "NO_SEASONALITY" - No seasonality
+	//   "DAILY" - Daily period, 24 hours.
+	//   "WEEKLY" - Weekly period, 7 days.
+	//   "MONTHLY" - Monthly period, 30 days or irregular.
+	//   "QUARTERLY" - Quarterly period, 90 days or irregular.
+	//   "YEARLY" - Yearly period, 365 days or irregular.
+	SeasonalPeriods []string `json:"seasonalPeriods,omitempty"`
+
+	// TimeSeriesId: The time_series_id value for this time series. It will
+	// be one of the unique values from the time_series_id_column specified
+	// during ARIMA model training. Only present when time_series_id_column
+	// training option was used.
+	TimeSeriesId string `json:"timeSeriesId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ArimaCoefficients")
 	// to unconditionally include in API requests. By default, fields with
@@ -576,26 +660,25 @@ func (s *ArimaOrder) MarshalJSON() ([]byte, error) {
 }
 
 // ArimaResult: (Auto-)arima fitting result. Wrap everything in
-// ArimaResult for easier
-// refactoring if we want to use model-specific iteration results.
+// ArimaResult for easier refactoring if we want to use model-specific
+// iteration results.
 type ArimaResult struct {
 	// ArimaModelInfo: This message is repeated because there are multiple
-	// arima models
-	// fitted in auto-arima. For non-auto-arima model, its size is one.
+	// arima models fitted in auto-arima. For non-auto-arima model, its size
+	// is one.
 	ArimaModelInfo []*ArimaModelInfo `json:"arimaModelInfo,omitempty"`
 
 	// SeasonalPeriods: Seasonal periods. Repeated because multiple periods
-	// are supported for
-	// one time series.
+	// are supported for one time series.
 	//
 	// Possible values:
 	//   "SEASONAL_PERIOD_TYPE_UNSPECIFIED"
 	//   "NO_SEASONALITY" - No seasonality
 	//   "DAILY" - Daily period, 24 hours.
 	//   "WEEKLY" - Weekly period, 7 days.
-	//   "MONTHLY" - Monthly period, can be as 30 days or irregular.
-	//   "QUARTERLY" - Quarterly period, can be as 90 days or irregular.
-	//   "YEARLY" - Yearly period, can be as 365 days or irregular.
+	//   "MONTHLY" - Monthly period, 30 days or irregular.
+	//   "QUARTERLY" - Quarterly period, 90 days or irregular.
+	//   "YEARLY" - Yearly period, 365 days or irregular.
 	SeasonalPeriods []string `json:"seasonalPeriods,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ArimaModelInfo") to
@@ -618,6 +701,159 @@ type ArimaResult struct {
 
 func (s *ArimaResult) MarshalJSON() ([]byte, error) {
 	type NoMethod ArimaResult
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ArimaSingleModelForecastingMetrics: Model evaluation metrics for a
+// single ARIMA forecasting model.
+type ArimaSingleModelForecastingMetrics struct {
+	// ArimaFittingMetrics: Arima fitting metrics.
+	ArimaFittingMetrics *ArimaFittingMetrics `json:"arimaFittingMetrics,omitempty"`
+
+	// HasDrift: Is arima model fitted with drift or not. It is always false
+	// when d is not 1.
+	HasDrift bool `json:"hasDrift,omitempty"`
+
+	// NonSeasonalOrder: Non-seasonal order.
+	NonSeasonalOrder *ArimaOrder `json:"nonSeasonalOrder,omitempty"`
+
+	// SeasonalPeriods: Seasonal periods. Repeated because multiple periods
+	// are supported for one time series.
+	//
+	// Possible values:
+	//   "SEASONAL_PERIOD_TYPE_UNSPECIFIED"
+	//   "NO_SEASONALITY" - No seasonality
+	//   "DAILY" - Daily period, 24 hours.
+	//   "WEEKLY" - Weekly period, 7 days.
+	//   "MONTHLY" - Monthly period, 30 days or irregular.
+	//   "QUARTERLY" - Quarterly period, 90 days or irregular.
+	//   "YEARLY" - Yearly period, 365 days or irregular.
+	SeasonalPeriods []string `json:"seasonalPeriods,omitempty"`
+
+	// TimeSeriesId: The time_series_id value for this time series. It will
+	// be one of the unique values from the time_series_id_column specified
+	// during ARIMA model training. Only present when time_series_id_column
+	// training option was used.
+	TimeSeriesId string `json:"timeSeriesId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ArimaFittingMetrics")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ArimaFittingMetrics") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ArimaSingleModelForecastingMetrics) MarshalJSON() ([]byte, error) {
+	type NoMethod ArimaSingleModelForecastingMetrics
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// AuditConfig: Specifies the audit configuration for a service. The
+// configuration determines which permission types are logged, and what
+// identities, if any, are exempted from logging. An AuditConfig must
+// have one or more AuditLogConfigs. If there are AuditConfigs for both
+// `allServices` and a specific service, the union of the two
+// AuditConfigs is used for that service: the log_types specified in
+// each AuditConfig are enabled, and the exempted_members in each
+// AuditLogConfig are exempted. Example Policy with multiple
+// AuditConfigs: { "audit_configs": [ { "service": "allServices",
+// "audit_log_configs": [ { "log_type": "DATA_READ", "exempted_members":
+// [ "user:jose@example.com" ] }, { "log_type": "DATA_WRITE" }, {
+// "log_type": "ADMIN_READ" } ] }, { "service":
+// "sampleservice.googleapis.com", "audit_log_configs": [ { "log_type":
+// "DATA_READ" }, { "log_type": "DATA_WRITE", "exempted_members": [
+// "user:aliya@example.com" ] } ] } ] } For sampleservice, this policy
+// enables DATA_READ, DATA_WRITE and ADMIN_READ logging. It also exempts
+// jose@example.com from DATA_READ logging, and aliya@example.com from
+// DATA_WRITE logging.
+type AuditConfig struct {
+	// AuditLogConfigs: The configuration for logging of each type of
+	// permission.
+	AuditLogConfigs []*AuditLogConfig `json:"auditLogConfigs,omitempty"`
+
+	// Service: Specifies a service that will be enabled for audit logging.
+	// For example, `storage.googleapis.com`, `cloudsql.googleapis.com`.
+	// `allServices` is a special value that covers all services.
+	Service string `json:"service,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AuditLogConfigs") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AuditLogConfigs") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AuditConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod AuditConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// AuditLogConfig: Provides the configuration for logging a type of
+// permissions. Example: { "audit_log_configs": [ { "log_type":
+// "DATA_READ", "exempted_members": [ "user:jose@example.com" ] }, {
+// "log_type": "DATA_WRITE" } ] } This enables 'DATA_READ' and
+// 'DATA_WRITE' logging, while exempting jose@example.com from DATA_READ
+// logging.
+type AuditLogConfig struct {
+	// ExemptedMembers: Specifies the identities that do not cause logging
+	// for this type of permission. Follows the same format of
+	// Binding.members.
+	ExemptedMembers []string `json:"exemptedMembers,omitempty"`
+
+	// LogType: The log type that this config enables.
+	//
+	// Possible values:
+	//   "LOG_TYPE_UNSPECIFIED" - Default case. Should never be this.
+	//   "ADMIN_READ" - Admin reads. Example: CloudIAM getIamPolicy
+	//   "DATA_WRITE" - Data writes. Example: CloudSQL Users create
+	//   "DATA_READ" - Data reads. Example: CloudSQL Users list
+	LogType string `json:"logType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ExemptedMembers") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ExemptedMembers") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AuditLogConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod AuditLogConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -888,13 +1124,11 @@ type BinaryConfusionMatrix struct {
 	PositiveClassThreshold float64 `json:"positiveClassThreshold,omitempty"`
 
 	// Precision: The fraction of actual positive predictions that had
-	// positive actual
-	// labels.
+	// positive actual labels.
 	Precision float64 `json:"precision,omitempty"`
 
 	// Recall: The fraction of actual positive labels that were given a
-	// positive
-	// prediction.
+	// positive prediction.
 	Recall float64 `json:"recall,omitempty"`
 
 	// TrueNegatives: Number of true samples predicted as false.
@@ -946,6 +1180,79 @@ func (s *BinaryConfusionMatrix) UnmarshalJSON(data []byte) error {
 	s.Precision = float64(s1.Precision)
 	s.Recall = float64(s1.Recall)
 	return nil
+}
+
+// Binding: Associates `members` with a `role`.
+type Binding struct {
+	// Condition: The condition that is associated with this binding. If the
+	// condition evaluates to `true`, then this binding applies to the
+	// current request. If the condition evaluates to `false`, then this
+	// binding does not apply to the current request. However, a different
+	// role binding might grant the same role to one or more of the members
+	// in this binding. To learn which resources support conditions in their
+	// IAM policies, see the IAM documentation
+	// (https://cloud.google.com/iam/help/conditions/resource-policies).
+	Condition *Expr `json:"condition,omitempty"`
+
+	// Members: Specifies the identities requesting access for a Cloud
+	// Platform resource. `members` can have the following values: *
+	// `allUsers`: A special identifier that represents anyone who is on the
+	// internet; with or without a Google account. *
+	// `allAuthenticatedUsers`: A special identifier that represents anyone
+	// who is authenticated with a Google account or a service account. *
+	// `user:{emailid}`: An email address that represents a specific Google
+	// account. For example, `alice@example.com` . *
+	// `serviceAccount:{emailid}`: An email address that represents a
+	// service account. For example,
+	// `my-other-app@appspot.gserviceaccount.com`. * `group:{emailid}`: An
+	// email address that represents a Google group. For example,
+	// `admins@example.com`. * `deleted:user:{emailid}?uid={uniqueid}`: An
+	// email address (plus unique identifier) representing a user that has
+	// been recently deleted. For example,
+	// `alice@example.com?uid=123456789012345678901`. If the user is
+	// recovered, this value reverts to `user:{emailid}` and the recovered
+	// user retains the role in the binding. *
+	// `deleted:serviceAccount:{emailid}?uid={uniqueid}`: An email address
+	// (plus unique identifier) representing a service account that has been
+	// recently deleted. For example,
+	// `my-other-app@appspot.gserviceaccount.com?uid=123456789012345678901`.
+	// If the service account is undeleted, this value reverts to
+	// `serviceAccount:{emailid}` and the undeleted service account retains
+	// the role in the binding. * `deleted:group:{emailid}?uid={uniqueid}`:
+	// An email address (plus unique identifier) representing a Google group
+	// that has been recently deleted. For example,
+	// `admins@example.com?uid=123456789012345678901`. If the group is
+	// recovered, this value reverts to `group:{emailid}` and the recovered
+	// group retains the role in the binding. * `domain:{domain}`: The G
+	// Suite domain (primary) that represents all the users of that domain.
+	// For example, `google.com` or `example.com`.
+	Members []string `json:"members,omitempty"`
+
+	// Role: Role that is assigned to `members`. For example,
+	// `roles/viewer`, `roles/editor`, or `roles/owner`.
+	Role string `json:"role,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Condition") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Condition") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Binding) MarshalJSON() ([]byte, error) {
+	type NoMethod Binding
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 type BqmlIterationResult struct {
@@ -1135,10 +1442,9 @@ func (s *BqmlTrainingRunTrainingOptions) UnmarshalJSON(data []byte) error {
 // CategoricalValue: Representative value of a categorical feature.
 type CategoricalValue struct {
 	// CategoryCounts: Counts of all categories for the categorical feature.
-	// If there are
-	// more than ten categories, we return top ten (by count) and return
-	// one more CategoryCount with category "_OTHER_" and count as
-	// aggregate counts of remaining categories.
+	// If there are more than ten categories, we return top ten (by count)
+	// and return one more CategoryCount with category "_OTHER_" and count
+	// as aggregate counts of remaining categories.
 	CategoryCounts []*CategoryCount `json:"categoryCounts,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "CategoryCounts") to
@@ -1171,8 +1477,7 @@ type CategoryCount struct {
 	// Category: The name of category.
 	Category string `json:"category,omitempty"`
 
-	// Count: The count of training samples matching the category within
-	// the
+	// Count: The count of training samples matching the category within the
 	// cluster.
 	Count int64 `json:"count,omitempty,string"`
 
@@ -1239,8 +1544,8 @@ type ClusterInfo struct {
 	// CentroidId: Centroid id.
 	CentroidId int64 `json:"centroidId,omitempty,string"`
 
-	// ClusterRadius: Cluster radius, the average distance from centroid
-	// to each point assigned to the cluster.
+	// ClusterRadius: Cluster radius, the average distance from centroid to
+	// each point assigned to the cluster.
 	ClusterRadius float64 `json:"clusterRadius,omitempty"`
 
 	// ClusterSize: Cluster size, the total number of points assigned to the
@@ -1317,7 +1622,7 @@ func (s *Clustering) MarshalJSON() ([]byte, error) {
 
 // ClusteringMetrics: Evaluation metrics for clustering models.
 type ClusteringMetrics struct {
-	// Clusters: [Beta] Information for all clusters.
+	// Clusters: Information for all clusters.
 	Clusters []*Cluster `json:"clusters,omitempty"`
 
 	// DaviesBouldinIndex: Davies-Bouldin index.
@@ -1370,8 +1675,7 @@ func (s *ClusteringMetrics) UnmarshalJSON(data []byte) error {
 // models.
 type ConfusionMatrix struct {
 	// ConfidenceThreshold: Confidence threshold used when computing the
-	// entries of the
-	// confusion matrix.
+	// entries of the confusion matrix.
 	ConfidenceThreshold float64 `json:"confidenceThreshold,omitempty"`
 
 	// Rows: One row per actual label.
@@ -1415,6 +1719,36 @@ func (s *ConfusionMatrix) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type ConnectionProperty struct {
+	// Key: [Required] Name of the connection property to set.
+	Key string `json:"key,omitempty"`
+
+	// Value: [Required] Value of the connection property.
+	Value string `json:"value,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Key") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Key") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ConnectionProperty) MarshalJSON() ([]byte, error) {
+	type NoMethod ConnectionProperty
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type CsvOptions struct {
 	// AllowJaggedRows: [Optional] Indicates if BigQuery should accept rows
 	// that are missing trailing optional columns. If true, BigQuery treats
@@ -1456,7 +1790,16 @@ type CsvOptions struct {
 	// SkipLeadingRows: [Optional] The number of rows at the top of a CSV
 	// file that BigQuery will skip when reading the data. The default value
 	// is 0. This property is useful if you have header rows in the file
-	// that should be skipped.
+	// that should be skipped. When autodetect is on, the behavior is the
+	// following: * skipLeadingRows unspecified - Autodetect tries to detect
+	// headers in the first row. If they are not detected, the row is read
+	// as data. Otherwise data is read starting from the second row. *
+	// skipLeadingRows is 0 - Instructs autodetect that there are no headers
+	// and data should be read starting from the first row. *
+	// skipLeadingRows = N > 0 - Autodetect skips N-1 rows and tries to
+	// detect headers in row N. If headers are not detected, row N is just
+	// skipped. Otherwise row N is used to extract column names for the
+	// detected schema.
 	SkipLeadingRows int64 `json:"skipLeadingRows,omitempty,string"`
 
 	// ForceSendFields is a list of field names (e.g. "AllowJaggedRows") to
@@ -1479,6 +1822,40 @@ type CsvOptions struct {
 
 func (s *CsvOptions) MarshalJSON() ([]byte, error) {
 	type NoMethod CsvOptions
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// DataSplitResult: Data split result. This contains references to the
+// training and evaluation data tables that were used to train the
+// model.
+type DataSplitResult struct {
+	// EvaluationTable: Table reference of the evaluation data after split.
+	EvaluationTable *TableReference `json:"evaluationTable,omitempty"`
+
+	// TrainingTable: Table reference of the training data after split.
+	TrainingTable *TableReference `json:"trainingTable,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "EvaluationTable") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "EvaluationTable") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DataSplitResult) MarshalJSON() ([]byte, error) {
+	type NoMethod DataSplitResult
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1566,6 +1943,9 @@ type Dataset struct {
 	// https://cloud.google.com/bigquery/docs/locations.
 	Location string `json:"location,omitempty"`
 
+	// SatisfiesPZS: [Output-only] Reserved for future use.
+	SatisfiesPZS bool `json:"satisfiesPZS,omitempty"`
+
 	// SelfLink: [Output-only] A URL that can be used to access the resource
 	// again. You can use this URL in Get or Update requests to the
 	// resource.
@@ -1599,6 +1979,13 @@ func (s *Dataset) MarshalJSON() ([]byte, error) {
 }
 
 type DatasetAccess struct {
+	// Dataset: [Pick one] A grant authorizing all resources of a particular
+	// type in a particular dataset access to this dataset. Only views are
+	// supported for now. The role field is not required when this field is
+	// set. If that dataset is deleted and re-created, its access needs to
+	// be granted again via an update operation.
+	Dataset *DatasetAccessEntry `json:"dataset,omitempty"`
+
 	// Domain: [Pick one] A domain to grant access to. Any users signed in
 	// with the domain specified will be granted the specified access.
 	// Example: "example.com". Maps to IAM policy member "domain:DOMAIN".
@@ -1621,6 +2008,14 @@ type DatasetAccess struct {
 	// "roles/bigquery.dataOwner", it will be returned back as "OWNER".
 	Role string `json:"role,omitempty"`
 
+	// Routine: [Pick one] A routine from a different dataset to grant
+	// access to. Queries executed against that routine will have read
+	// access to views/tables/routines in this dataset. Only UDF is
+	// supported for now. The role field is not required when this field is
+	// set. If that routine is updated by any user, access to the routine
+	// needs to be granted again via an update operation.
+	Routine *RoutineReference `json:"routine,omitempty"`
+
 	// SpecialGroup: [Pick one] A special group to grant access to. Possible
 	// values include: projectOwners: Owners of the enclosing project.
 	// projectReaders: Readers of the enclosing project. projectWriters:
@@ -1640,7 +2035,7 @@ type DatasetAccess struct {
 	// granted again via an update operation.
 	View *TableReference `json:"view,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Domain") to
+	// ForceSendFields is a list of field names (e.g. "Dataset") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -1648,8 +2043,8 @@ type DatasetAccess struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Domain") to include in API
-	// requests with the JSON null value. By default, fields with empty
+	// NullFields is a list of field names (e.g. "Dataset") to include in
+	// API requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
 	// null. It is an error if a field in this list has a non-empty value.
@@ -1659,6 +2054,65 @@ type DatasetAccess struct {
 
 func (s *DatasetAccess) MarshalJSON() ([]byte, error) {
 	type NoMethod DatasetAccess
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type DatasetAccessEntry struct {
+	// Dataset: [Required] The dataset this entry applies to.
+	Dataset *DatasetReference `json:"dataset,omitempty"`
+
+	TargetTypes []*DatasetAccessEntryTargetTypes `json:"target_types,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Dataset") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Dataset") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DatasetAccessEntry) MarshalJSON() ([]byte, error) {
+	type NoMethod DatasetAccessEntry
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type DatasetAccessEntryTargetTypes struct {
+	// TargetType: [Required] Which resources in the dataset this entry
+	// applies to. Currently, only views are supported, but additional
+	// target types may be added in the future. Possible values: VIEWS: This
+	// entry applies to all views in the dataset.
+	TargetType string `json:"targetType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "TargetType") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "TargetType") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DatasetAccessEntryTargetTypes) MarshalJSON() ([]byte, error) {
+	type NoMethod DatasetAccessEntryTargetTypes
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1830,6 +2284,52 @@ func (s *DestinationTableProperties) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// DimensionalityReductionMetrics: Model evaluation metrics for
+// dimensionality reduction models.
+type DimensionalityReductionMetrics struct {
+	// TotalExplainedVarianceRatio: Total percentage of variance explained
+	// by the selected principal components.
+	TotalExplainedVarianceRatio float64 `json:"totalExplainedVarianceRatio,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "TotalExplainedVarianceRatio") to unconditionally include in API
+	// requests. By default, fields with empty values are omitted from API
+	// requests. However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g.
+	// "TotalExplainedVarianceRatio") to include in API requests with the
+	// JSON null value. By default, fields with empty values are omitted
+	// from API requests. However, any field with an empty value appearing
+	// in NullFields will be sent to the server as null. It is an error if a
+	// field in this list has a non-empty value. This may be used to include
+	// null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DimensionalityReductionMetrics) MarshalJSON() ([]byte, error) {
+	type NoMethod DimensionalityReductionMetrics
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *DimensionalityReductionMetrics) UnmarshalJSON(data []byte) error {
+	type NoMethod DimensionalityReductionMetrics
+	var s1 struct {
+		TotalExplainedVarianceRatio gensupport.JSONFloat64 `json:"totalExplainedVarianceRatio"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.TotalExplainedVarianceRatio = float64(s1.TotalExplainedVarianceRatio)
+	return nil
+}
+
 type EncryptionConfiguration struct {
 	// KmsKeyName: [Optional] Describes the Cloud KMS encryption key that
 	// will be used to protect destination BigQuery table. The BigQuery
@@ -1866,8 +2366,7 @@ type Entry struct {
 	ItemCount int64 `json:"itemCount,omitempty,string"`
 
 	// PredictedLabel: The predicted label. For confidence_threshold > 0, we
-	// will
-	// also add an entry indicating the number of items under the
+	// will also add an entry indicating the number of items under the
 	// confidence threshold.
 	PredictedLabel string `json:"predictedLabel,omitempty"`
 
@@ -1932,11 +2431,13 @@ func (s *ErrorProto) MarshalJSON() ([]byte, error) {
 }
 
 // EvaluationMetrics: Evaluation metrics of a model. These are either
-// computed on all training
-// data or just the eval data based on whether eval data was used
-// during
-// training. These are not present for imported models.
+// computed on all training data or just the eval data based on whether
+// eval data was used during training. These are not present for
+// imported models.
 type EvaluationMetrics struct {
+	// ArimaForecastingMetrics: Populated for ARIMA models.
+	ArimaForecastingMetrics *ArimaForecastingMetrics `json:"arimaForecastingMetrics,omitempty"`
+
 	// BinaryClassificationMetrics: Populated for binary
 	// classification/classifier models.
 	BinaryClassificationMetrics *BinaryClassificationMetrics `json:"binaryClassificationMetrics,omitempty"`
@@ -1944,17 +2445,24 @@ type EvaluationMetrics struct {
 	// ClusteringMetrics: Populated for clustering models.
 	ClusteringMetrics *ClusteringMetrics `json:"clusteringMetrics,omitempty"`
 
+	// DimensionalityReductionMetrics: Evaluation metrics when the model is
+	// a dimensionality reduction model, which currently includes PCA.
+	DimensionalityReductionMetrics *DimensionalityReductionMetrics `json:"dimensionalityReductionMetrics,omitempty"`
+
 	// MultiClassClassificationMetrics: Populated for multi-class
 	// classification/classifier models.
 	MultiClassClassificationMetrics *MultiClassClassificationMetrics `json:"multiClassClassificationMetrics,omitempty"`
 
-	// RegressionMetrics: Populated for regression models and explicit
-	// feedback type matrix
+	// RankingMetrics: Populated for implicit feedback type matrix
 	// factorization models.
+	RankingMetrics *RankingMetrics `json:"rankingMetrics,omitempty"`
+
+	// RegressionMetrics: Populated for regression models and explicit
+	// feedback type matrix factorization models.
 	RegressionMetrics *RegressionMetrics `json:"regressionMetrics,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g.
-	// "BinaryClassificationMetrics") to unconditionally include in API
+	// "ArimaForecastingMetrics") to unconditionally include in API
 	// requests. By default, fields with empty values are omitted from API
 	// requests. However, any non-pointer, non-interface field appearing in
 	// ForceSendFields will be sent to the server regardless of whether the
@@ -1962,13 +2470,13 @@ type EvaluationMetrics struct {
 	// Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g.
-	// "BinaryClassificationMetrics") to include in API requests with the
-	// JSON null value. By default, fields with empty values are omitted
-	// from API requests. However, any field with an empty value appearing
-	// in NullFields will be sent to the server as null. It is an error if a
-	// field in this list has a non-empty value. This may be used to include
-	// null fields in Patch requests.
+	// NullFields is a list of field names (e.g. "ArimaForecastingMetrics")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
 	NullFields []string `json:"-"`
 }
 
@@ -2039,6 +2547,9 @@ type ExplainQueryStage struct {
 	// ShuffleOutputBytesSpilled: Total number of bytes written to shuffle
 	// and spilled to disk.
 	ShuffleOutputBytesSpilled int64 `json:"shuffleOutputBytesSpilled,omitempty,string"`
+
+	// SlotMs: Slot-milliseconds used by the stage.
+	SlotMs int64 `json:"slotMs,omitempty,string"`
 
 	// StartMs: Stage start time represented as milliseconds since epoch.
 	StartMs int64 `json:"startMs,omitempty,string"`
@@ -2163,6 +2674,113 @@ func (s *ExplainQueryStep) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// Explanation: Explanation for a single feature.
+type Explanation struct {
+	// Attribution: Attribution of feature.
+	Attribution float64 `json:"attribution,omitempty"`
+
+	// FeatureName: Full name of the feature. For non-numerical features,
+	// will be formatted like .. Overall size of feature name will always be
+	// truncated to first 120 characters.
+	FeatureName string `json:"featureName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Attribution") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Attribution") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Explanation) MarshalJSON() ([]byte, error) {
+	type NoMethod Explanation
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *Explanation) UnmarshalJSON(data []byte) error {
+	type NoMethod Explanation
+	var s1 struct {
+		Attribution gensupport.JSONFloat64 `json:"attribution"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.Attribution = float64(s1.Attribution)
+	return nil
+}
+
+// Expr: Represents a textual expression in the Common Expression
+// Language (CEL) syntax. CEL is a C-like expression language. The
+// syntax and semantics of CEL are documented at
+// https://github.com/google/cel-spec. Example (Comparison): title:
+// "Summary size limit" description: "Determines if a summary is less
+// than 100 chars" expression: "document.summary.size() < 100" Example
+// (Equality): title: "Requestor is owner" description: "Determines if
+// requestor is the document owner" expression: "document.owner ==
+// request.auth.claims.email" Example (Logic): title: "Public documents"
+// description: "Determine whether the document should be publicly
+// visible" expression: "document.type != 'private' && document.type !=
+// 'internal'" Example (Data Manipulation): title: "Notification string"
+// description: "Create a notification string with a timestamp."
+// expression: "'New message received at ' +
+// string(document.create_time)" The exact variables and functions that
+// may be referenced within an expression are determined by the service
+// that evaluates it. See the service documentation for additional
+// information.
+type Expr struct {
+	// Description: Optional. Description of the expression. This is a
+	// longer text which describes the expression, e.g. when hovered over it
+	// in a UI.
+	Description string `json:"description,omitempty"`
+
+	// Expression: Textual representation of an expression in Common
+	// Expression Language syntax.
+	Expression string `json:"expression,omitempty"`
+
+	// Location: Optional. String indicating the location of the expression
+	// for error reporting, e.g. a file name and a position in the file.
+	Location string `json:"location,omitempty"`
+
+	// Title: Optional. Title for the expression, i.e. a short string
+	// describing its purpose. This can be used e.g. in UIs which allow to
+	// enter the expression.
+	Title string `json:"title,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Description") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Expr) MarshalJSON() ([]byte, error) {
+	type NoMethod Expr
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type ExternalDataConfiguration struct {
 	// Autodetect: Try to detect schema and format options automatically.
 	// Any option specified explicitly will be honored.
@@ -2178,6 +2796,10 @@ type ExternalDataConfiguration struct {
 	// Datastore backups and Avro formats.
 	Compression string `json:"compression,omitempty"`
 
+	// ConnectionId: [Optional, Trusted Tester] Connection for external data
+	// source.
+	ConnectionId string `json:"connectionId,omitempty"`
+
 	// CsvOptions: Additional properties to set if sourceFormat is set to
 	// CSV.
 	CsvOptions *CsvOptions `json:"csvOptions,omitempty"`
@@ -2186,18 +2808,8 @@ type ExternalDataConfiguration struct {
 	// set to GOOGLE_SHEETS.
 	GoogleSheetsOptions *GoogleSheetsOptions `json:"googleSheetsOptions,omitempty"`
 
-	// HivePartitioningMode: [Optional, Trusted Tester] If hive partitioning
-	// is enabled, which mode to use. Two modes are supported: - AUTO:
-	// automatically infer partition key name(s) and type(s). - STRINGS:
-	// automatic infer partition key name(s). All types are strings. Not all
-	// storage formats support hive partitioning -- requesting hive
-	// partitioning on an unsupported format will lead to an error. Note:
-	// this setting is in the process of being deprecated in favor of
-	// hivePartitioningOptions.
-	HivePartitioningMode string `json:"hivePartitioningMode,omitempty"`
-
-	// HivePartitioningOptions: [Optional, Trusted Tester] Options to
-	// configure hive partitioning support.
+	// HivePartitioningOptions: [Optional] Options to configure hive
+	// partitioning support.
 	HivePartitioningOptions *HivePartitioningOptions `json:"hivePartitioningOptions,omitempty"`
 
 	// IgnoreUnknownValues: [Optional] Indicates if BigQuery should allow
@@ -2220,6 +2832,10 @@ type ExternalDataConfiguration struct {
 	// is ignored for Google Cloud Bigtable, Google Cloud Datastore backups
 	// and Avro formats.
 	MaxBadRecords int64 `json:"maxBadRecords,omitempty"`
+
+	// ParquetOptions: Additional properties to set if sourceFormat is set
+	// to Parquet.
+	ParquetOptions *ParquetOptions `json:"parquetOptions,omitempty"`
 
 	// Schema: [Optional] The schema for the data. Schema is required for
 	// CSV and JSON formats. Schema is disallowed for Google Cloud Bigtable,
@@ -2278,8 +2894,7 @@ type FeatureValue struct {
 	FeatureColumn string `json:"featureColumn,omitempty"`
 
 	// NumericalValue: The numerical feature value. This is the centroid
-	// value for this
-	// feature.
+	// value for this feature.
 	NumericalValue float64 `json:"numericalValue,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "CategoricalValue") to
@@ -2318,6 +2933,72 @@ func (s *FeatureValue) UnmarshalJSON(data []byte) error {
 	}
 	s.NumericalValue = float64(s1.NumericalValue)
 	return nil
+}
+
+// GetIamPolicyRequest: Request message for `GetIamPolicy` method.
+type GetIamPolicyRequest struct {
+	// Options: OPTIONAL: A `GetPolicyOptions` object for specifying options
+	// to `GetIamPolicy`.
+	Options *GetPolicyOptions `json:"options,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Options") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Options") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetIamPolicyRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod GetIamPolicyRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GetPolicyOptions: Encapsulates settings provided to GetIamPolicy.
+type GetPolicyOptions struct {
+	// RequestedPolicyVersion: Optional. The policy format version to be
+	// returned. Valid values are 0, 1, and 3. Requests specifying an
+	// invalid value will be rejected. Requests for policies with any
+	// conditional bindings must specify version 3. Policies without any
+	// conditional bindings may specify any valid value or leave the field
+	// unset. To learn which resources support conditions in their IAM
+	// policies, see the IAM documentation
+	// (https://cloud.google.com/iam/help/conditions/resource-policies).
+	RequestedPolicyVersion int64 `json:"requestedPolicyVersion,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "RequestedPolicyVersion") to unconditionally include in API requests.
+	// By default, fields with empty values are omitted from API requests.
+	// However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "RequestedPolicyVersion")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetPolicyOptions) MarshalJSON() ([]byte, error) {
+	type NoMethod GetPolicyOptions
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 type GetQueryResultsResponse struct {
@@ -2437,6 +3118,41 @@ func (s *GetServiceAccountResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// GlobalExplanation: Global explanations containing the top most
+// important features after training.
+type GlobalExplanation struct {
+	// ClassLabel: Class label for this set of global explanations. Will be
+	// empty/null for binary logistic and linear regression models. Sorted
+	// alphabetically in descending order.
+	ClassLabel string `json:"classLabel,omitempty"`
+
+	// Explanations: A list of the top global explanations. Sorted by
+	// absolute value of attribution in descending order.
+	Explanations []*Explanation `json:"explanations,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ClassLabel") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ClassLabel") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GlobalExplanation) MarshalJSON() ([]byte, error) {
+	type NoMethod GlobalExplanation
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type GoogleSheetsOptions struct {
 	// Range: [Optional] Range of a sheet to query from. Only used when
 	// non-empty. Typical format:
@@ -2483,21 +3199,29 @@ func (s *GoogleSheetsOptions) MarshalJSON() ([]byte, error) {
 }
 
 type HivePartitioningOptions struct {
-	// Mode: [Optional, Trusted Tester] When set, what mode of hive
-	// partitioning to use when reading data. Two modes are supported. (1)
-	// AUTO: automatically infer partition key name(s) and type(s). (2)
-	// STRINGS: automatically infer partition key name(s). All types are
-	// interpreted as strings. Not all storage formats support hive
-	// partitioning. Requesting hive partitioning on an unsupported format
-	// will lead to an error. Currently supported types include: AVRO, CSV,
-	// JSON, ORC and Parquet.
+	// Mode: [Optional] When set, what mode of hive partitioning to use when
+	// reading data. The following modes are supported. (1) AUTO:
+	// automatically infer partition key name(s) and type(s). (2) STRINGS:
+	// automatically infer partition key name(s). All types are interpreted
+	// as strings. (3) CUSTOM: partition key schema is encoded in the source
+	// URI prefix. Not all storage formats support hive partitioning.
+	// Requesting hive partitioning on an unsupported format will lead to an
+	// error. Currently supported types include: AVRO, CSV, JSON, ORC and
+	// Parquet.
 	Mode string `json:"mode,omitempty"`
 
-	// SourceUriPrefix: [Optional, Trusted Tester] When hive partition
-	// detection is requested, a common prefix for all source uris should be
-	// supplied. The prefix must end immediately before the partition key
-	// encoding begins. For example, consider files following this data
-	// layout.
+	// RequirePartitionFilter: [Optional] If set to true, queries over this
+	// table require a partition filter that can be used for partition
+	// elimination to be specified. Note that this field should only be true
+	// when creating a permanent external table or querying a temporary
+	// external table. Hive-partitioned loads with requirePartitionFilter
+	// explicitly set to true will fail.
+	RequirePartitionFilter bool `json:"requirePartitionFilter,omitempty"`
+
+	// SourceUriPrefix: [Optional] When hive partition detection is
+	// requested, a common prefix for all source uris should be supplied.
+	// The prefix must end immediately before the partition key encoding
+	// begins. For example, consider files following this data layout.
 	// gs://bucket/path_to_table/dt=2019-01-01/country=BR/id=7/file.avro
 	// gs://bucket/path_to_table/dt=2018-12-31/country=CA/id=3/file.avro
 	// When hive partitioning is requested with either AUTO or STRINGS
@@ -2548,6 +3272,9 @@ type IterationResult struct {
 
 	// LearnRate: Learn rate used for this iteration.
 	LearnRate float64 `json:"learnRate,omitempty"`
+
+	// PrincipalComponentInfos: The information of the principal components.
+	PrincipalComponentInfos []*PrincipalComponentInfo `json:"principalComponentInfos,omitempty"`
 
 	// TrainingLoss: Loss computed on the training data at the end of
 	// iteration.
@@ -2749,13 +3476,15 @@ type JobConfigurationExtract struct {
 	// Compression: [Optional] The compression type to use for exported
 	// files. Possible values include GZIP, DEFLATE, SNAPPY, and NONE. The
 	// default value is NONE. DEFLATE and SNAPPY are only supported for
-	// Avro.
+	// Avro. Not applicable when extracting models.
 	Compression string `json:"compression,omitempty"`
 
 	// DestinationFormat: [Optional] The exported file format. Possible
-	// values include CSV, NEWLINE_DELIMITED_JSON and AVRO. The default
-	// value is CSV. Tables with nested or repeated fields cannot be
-	// exported as CSV.
+	// values include CSV, NEWLINE_DELIMITED_JSON, PARQUET or AVRO for
+	// tables and ML_TF_SAVED_MODEL or ML_XGBOOST_BOOSTER for models. The
+	// default value for tables is CSV. Tables with nested or repeated
+	// fields cannot be exported as CSV. The default value for models is
+	// ML_TF_SAVED_MODEL.
 	DestinationFormat string `json:"destinationFormat,omitempty"`
 
 	// DestinationUri: [Pick one] DEPRECATED: Use destinationUris instead,
@@ -2768,11 +3497,11 @@ type JobConfigurationExtract struct {
 	DestinationUris []string `json:"destinationUris,omitempty"`
 
 	// FieldDelimiter: [Optional] Delimiter to use between fields in the
-	// exported data. Default is ','
+	// exported data. Default is ','. Not applicable when extracting models.
 	FieldDelimiter string `json:"fieldDelimiter,omitempty"`
 
 	// PrintHeader: [Optional] Whether to print out a header row in the
-	// results. Default is true.
+	// results. Default is true. Not applicable when extracting models.
 	//
 	// Default: true
 	PrintHeader *bool `json:"printHeader,omitempty"`
@@ -2787,7 +3516,7 @@ type JobConfigurationExtract struct {
 	// "AVRO", this flag indicates whether to enable extracting applicable
 	// column types (such as TIMESTAMP) to their corresponding AVRO logical
 	// types (timestamp-micros), instead of only using their raw types
-	// (avro-long).
+	// (avro-long). Not applicable when extracting models.
 	UseAvroLogicalTypes bool `json:"useAvroLogicalTypes,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Compression") to
@@ -2845,6 +3574,29 @@ type JobConfigurationLoad struct {
 	// one atomic update upon job completion.
 	CreateDisposition string `json:"createDisposition,omitempty"`
 
+	// DecimalTargetTypes: Defines the list of possible SQL data types to
+	// which the source decimal values are converted. This list and the
+	// precision and the scale parameters of the decimal field determine the
+	// target type. In the order of NUMERIC, BIGNUMERIC (Preview
+	// (/products/#product-launch-stages)), and STRING, a type is picked if
+	// it is in the specified list and if it supports the precision and the
+	// scale. STRING supports all precision and scale values. If none of the
+	// listed types supports the precision and the scale, the type
+	// supporting the widest range in the specified list is picked, and if a
+	// value exceeds the supported range when reading the data, an error
+	// will be thrown. Example: Suppose the value of this field is
+	// ["NUMERIC", "BIGNUMERIC"]. If (precision,scale) is: * (38,9) ->
+	// NUMERIC; * (39,9) -> BIGNUMERIC (NUMERIC cannot hold 30 integer
+	// digits); * (38,10) -> BIGNUMERIC (NUMERIC cannot hold 10 fractional
+	// digits); * (76,38) -> BIGNUMERIC; * (77,38) -> BIGNUMERIC (error if
+	// value exeeds supported range). This field cannot contain duplicate
+	// types. The order of the types in this field is ignored. For example,
+	// ["BIGNUMERIC", "NUMERIC"] is the same as ["NUMERIC", "BIGNUMERIC"]
+	// and NUMERIC always takes precedence over BIGNUMERIC. Defaults to
+	// ["NUMERIC", "STRING"] for ORC and ["NUMERIC"] for the other file
+	// formats.
+	DecimalTargetTypes []string `json:"decimalTargetTypes,omitempty"`
+
 	// DestinationEncryptionConfiguration: Custom encryption configuration
 	// (e.g., Cloud KMS keys).
 	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
@@ -2872,16 +3624,8 @@ type JobConfigurationLoad struct {
 	// specify a tab separator. The default value is a comma (',').
 	FieldDelimiter string `json:"fieldDelimiter,omitempty"`
 
-	// HivePartitioningMode: [Optional, Trusted Tester] If hive partitioning
-	// is enabled, which mode to use. Two modes are supported: - AUTO:
-	// automatically infer partition key name(s) and type(s). - STRINGS:
-	// automatic infer partition key name(s). All types are strings. Not all
-	// storage formats support hive partitioning -- requesting hive
-	// partitioning on an unsupported format will lead to an error.
-	HivePartitioningMode string `json:"hivePartitioningMode,omitempty"`
-
-	// HivePartitioningOptions: [Optional, Trusted Tester] Options to
-	// configure hive partitioning support.
+	// HivePartitioningOptions: [Optional] Options to configure hive
+	// partitioning support.
 	HivePartitioningOptions *HivePartitioningOptions `json:"hivePartitioningOptions,omitempty"`
 
 	// IgnoreUnknownValues: [Optional] Indicates if BigQuery should allow
@@ -2893,6 +3637,13 @@ type JobConfigurationLoad struct {
 	// an extra value: CSV: Trailing columns JSON: Named values that don't
 	// match any column names
 	IgnoreUnknownValues bool `json:"ignoreUnknownValues,omitempty"`
+
+	// JsonExtension: [Optional] If sourceFormat is set to newline-delimited
+	// JSON, indicates whether it should be processed as a JSON variant such
+	// as GeoJSON. For a sourceFormat other than JSON, omit this field. If
+	// the sourceFormat is newline-delimited JSON: - for newline-delimited
+	// GeoJSON: set to GEOJSON.
+	JsonExtension string `json:"jsonExtension,omitempty"`
 
 	// MaxBadRecords: [Optional] The maximum number of bad records that
 	// BigQuery can ignore when running the job. If the number of bad
@@ -2909,6 +3660,9 @@ type JobConfigurationLoad struct {
 	// data types except for STRING and BYTE. For STRING and BYTE columns,
 	// BigQuery interprets the empty string as an empty value.
 	NullMarker string `json:"nullMarker,omitempty"`
+
+	// ParquetOptions: [Optional] Options to configure parquet support.
+	ParquetOptions *ParquetOptions `json:"parquetOptions,omitempty"`
 
 	// ProjectionFields: If sourceFormat is set to "DATASTORE_BACKUP",
 	// indicates which entity properties to load into BigQuery from a Cloud
@@ -3045,6 +3799,9 @@ type JobConfigurationQuery struct {
 	// table will be first partitioned and subsequently clustered.
 	Clustering *Clustering `json:"clustering,omitempty"`
 
+	// ConnectionProperties: Connection properties.
+	ConnectionProperties []*ConnectionProperty `json:"connectionProperties,omitempty"`
+
 	// CreateDisposition: [Optional] Specifies whether the job is allowed to
 	// create new tables. The following values are supported:
 	// CREATE_IF_NEEDED: If the table does not exist, BigQuery creates the
@@ -3053,6 +3810,12 @@ type JobConfigurationQuery struct {
 	// CREATE_IF_NEEDED. Creation, truncation and append actions occur as
 	// one atomic update upon job completion.
 	CreateDisposition string `json:"createDisposition,omitempty"`
+
+	// CreateSession: If true, creates a new session, where session id will
+	// be a server generated random id. If false, runs query with an
+	// existing session_id passed in ConnectionProperty, otherwise runs
+	// query in non-session mode.
+	CreateSession bool `json:"createSession,omitempty"`
 
 	// DefaultDataset: [Optional] Specifies the default dataset to use for
 	// unqualified table names in the query. Note that this does not alter
@@ -3212,8 +3975,17 @@ type JobConfigurationTableCopy struct {
 	// (e.g., Cloud KMS keys).
 	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
 
+	// DestinationExpirationTime: [Optional] The time when the destination
+	// table expires. Expired tables will be deleted and their storage
+	// reclaimed.
+	DestinationExpirationTime interface{} `json:"destinationExpirationTime,omitempty"`
+
 	// DestinationTable: [Required] The destination table
 	DestinationTable *TableReference `json:"destinationTable,omitempty"`
+
+	// OperationType: [Optional] Supported operation types in table copy
+	// job.
+	OperationType string `json:"operationType,omitempty"`
 
 	// SourceTable: [Pick one] Source table to copy.
 	SourceTable *TableReference `json:"sourceTable,omitempty"`
@@ -3433,9 +4205,17 @@ type JobStatistics struct {
 	// used to execute this job.
 	ReservationId string `json:"reservation_id,omitempty"`
 
+	// RowLevelSecurityStatistics: [Output-only] [Preview] Statistics for
+	// row-level security. Present only for query and extract jobs.
+	RowLevelSecurityStatistics *RowLevelSecurityStatistics `json:"rowLevelSecurityStatistics,omitempty"`
+
 	// ScriptStatistics: [Output-only] Statistics for a child job of a
 	// script.
 	ScriptStatistics *ScriptStatistics `json:"scriptStatistics,omitempty"`
+
+	// SessionInfoTemplate: [Output-only] [Preview] Information of the
+	// session if this job is part of one.
+	SessionInfoTemplate *SessionInfo `json:"sessionInfoTemplate,omitempty"`
 
 	// StartTime: [Output-only] Start time of this job, in milliseconds
 	// since the epoch. This field will be present when the job transitions
@@ -3448,6 +4228,10 @@ type JobStatistics struct {
 
 	// TotalSlotMs: [Output-only] Slot-milliseconds for the job.
 	TotalSlotMs int64 `json:"totalSlotMs,omitempty,string"`
+
+	// TransactionInfoTemplate: [Output-only] [Alpha] Information of the
+	// multi-statement transaction if this job is part of one.
+	TransactionInfoTemplate *TransactionInfo `json:"transactionInfoTemplate,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "CompletionRatio") to
 	// unconditionally include in API requests. By default, fields with
@@ -3527,6 +4311,11 @@ type JobStatistics2 struct {
 	// query cache.
 	CacheHit bool `json:"cacheHit,omitempty"`
 
+	// DdlAffectedRowAccessPolicyCount: [Output-only] [Preview] The number
+	// of row access policies affected by a DDL statement. Present only for
+	// DROP ALL ROW ACCESS POLICIES queries.
+	DdlAffectedRowAccessPolicyCount int64 `json:"ddlAffectedRowAccessPolicyCount,omitempty,string"`
+
 	// DdlOperationPerformed: The DDL operation performed, possibly
 	// dependent on the pre-existence of the DDL target. Possible values
 	// (new values might be added in the future): "CREATE": The query
@@ -3538,12 +4327,21 @@ type JobStatistics2 struct {
 	// query deleted the DDL target.
 	DdlOperationPerformed string `json:"ddlOperationPerformed,omitempty"`
 
+	// DdlTargetDataset: [Output-only] The DDL target dataset. Present only
+	// for CREATE/ALTER/DROP SCHEMA queries.
+	DdlTargetDataset *DatasetReference `json:"ddlTargetDataset,omitempty"`
+
 	// DdlTargetRoutine: The DDL target routine. Present only for
 	// CREATE/DROP FUNCTION/PROCEDURE queries.
 	DdlTargetRoutine *RoutineReference `json:"ddlTargetRoutine,omitempty"`
 
-	// DdlTargetTable: The DDL target table. Present only for CREATE/DROP
-	// TABLE/VIEW queries.
+	// DdlTargetRowAccessPolicy: [Output-only] [Preview] The DDL target row
+	// access policy. Present only for CREATE/DROP ROW ACCESS POLICY
+	// queries.
+	DdlTargetRowAccessPolicy *RowAccessPolicyReference `json:"ddlTargetRowAccessPolicy,omitempty"`
+
+	// DdlTargetTable: [Output-only] The DDL target table. Present only for
+	// CREATE/DROP TABLE/VIEW and DROP ALL ROW ACCESS POLICIES queries.
 	DdlTargetTable *TableReference `json:"ddlTargetTable,omitempty"`
 
 	// EstimatedBytesProcessed: [Output-only] The original estimate of bytes
@@ -3590,8 +4388,23 @@ type JobStatistics2 struct {
 	// StatementType: The type of query statement, if valid. Possible values
 	// (new values might be added in the future): "SELECT": SELECT query.
 	// "INSERT": INSERT query; see
-	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language. "UPDATE": UPDATE query; see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language. "DELETE": DELETE query; see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language. "MERGE": MERGE query; see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language. "ALTER_TABLE": ALTER TABLE query. "ALTER_VIEW": ALTER VIEW query. "CREATE_FUNCTION": CREATE FUNCTION query. "CREATE_MODEL": CREATE [OR REPLACE] MODEL ... AS SELECT ... . "CREATE_PROCEDURE": CREATE PROCEDURE query. "CREATE_TABLE": CREATE [OR REPLACE] TABLE without AS SELECT. "CREATE_TABLE_AS_SELECT": CREATE [OR REPLACE] TABLE ... AS SELECT ... . "CREATE_VIEW": CREATE [OR REPLACE] VIEW ... AS SELECT ... . "DROP_FUNCTION" : DROP FUNCTION query. "DROP_PROCEDURE": DROP PROCEDURE query. "DROP_TABLE": DROP TABLE query. "DROP_VIEW": DROP VIEW
-	// query.
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language.
+	// "UPDATE": UPDATE query; see
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language.
+	// "DELETE": DELETE query; see
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language.
+	// "MERGE": MERGE query; see
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language.
+	// "ALTER_TABLE": ALTER TABLE query. "ALTER_VIEW": ALTER VIEW query.
+	// "ASSERT": ASSERT condition AS 'description'. "CREATE_FUNCTION":
+	// CREATE FUNCTION query. "CREATE_MODEL": CREATE [OR REPLACE] MODEL ...
+	// AS SELECT ... . "CREATE_PROCEDURE": CREATE PROCEDURE query.
+	// "CREATE_TABLE": CREATE [OR REPLACE] TABLE without AS SELECT.
+	// "CREATE_TABLE_AS_SELECT": CREATE [OR REPLACE] TABLE ... AS SELECT ...
+	// . "CREATE_VIEW": CREATE [OR REPLACE] VIEW ... AS SELECT ... .
+	// "DROP_FUNCTION" : DROP FUNCTION query. "DROP_PROCEDURE": DROP
+	// PROCEDURE query. "DROP_TABLE": DROP TABLE query. "DROP_VIEW": DROP
+	// VIEW query.
 	StatementType string `json:"statementType,omitempty"`
 
 	// Timeline: [Output-only] [Beta] Describes a timeline of job execution.
@@ -3802,10 +4615,8 @@ type JsonValue interface{}
 
 type ListModelsResponse struct {
 	// Models: Models in the requested dataset. Only the following fields
-	// are populated:
-	// model_reference, model_type, creation_time, last_modified_time
-	// and
-	// labels.
+	// are populated: model_reference, model_type, creation_time,
+	// last_modified_time and labels.
 	Models []*Model `json:"models,omitempty"`
 
 	// NextPageToken: A token to request the next page of results.
@@ -3842,11 +4653,10 @@ type ListRoutinesResponse struct {
 	// NextPageToken: A token to request the next page of results.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
-	// Routines: Routines in the requested dataset. Only the following
-	// fields are populated:
-	// etag, project_id, dataset_id, routine_id, routine_type,
-	// creation_time,
-	// last_modified_time, language.
+	// Routines: Routines in the requested dataset. Unless read_mask is set
+	// in the request, only the following fields are populated: etag,
+	// project_id, dataset_id, routine_id, routine_type, creation_time,
+	// last_modified_time, and language.
 	Routines []*Routine `json:"routines,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -3876,16 +4686,49 @@ func (s *ListRoutinesResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ListRowAccessPoliciesResponse: Response message for the
+// ListRowAccessPolicies method.
+type ListRowAccessPoliciesResponse struct {
+	// NextPageToken: A token to request the next page of results.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// RowAccessPolicies: Row access policies on the requested table.
+	RowAccessPolicies []*RowAccessPolicy `json:"rowAccessPolicies,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "NextPageToken") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "NextPageToken") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListRowAccessPoliciesResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListRowAccessPoliciesResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // LocationMetadata: BigQuery-specific metadata about a location. This
-// will be set on
-// google.cloud.location.Location.metadata in Cloud Location
-// API
-// responses.
+// will be set on google.cloud.location.Location.metadata in Cloud
+// Location API responses.
 type LocationMetadata struct {
 	// LegacyLocationId: The legacy BigQuery location ID, e.g. “EU” for
-	// the “europe” location.
-	// This is for any API consumers that need the legacy “US” and
-	// “EU” locations.
+	// the “europe” location. This is for any API consumers that need
+	// the legacy “US” and “EU” locations.
 	LegacyLocationId string `json:"legacyLocationId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "LegacyLocationId") to
@@ -3913,6 +4756,11 @@ func (s *LocationMetadata) MarshalJSON() ([]byte, error) {
 }
 
 type MaterializedViewDefinition struct {
+	// EnableRefresh: [Optional] [TrustedTester] Enable automatic refresh of
+	// the materialized view when the base table is updated. The default
+	// value is "true".
+	EnableRefresh bool `json:"enableRefresh,omitempty"`
+
 	// LastRefreshTime: [Output-only] [TrustedTester] The time when this
 	// materialized view was last modified, in milliseconds since the epoch.
 	LastRefreshTime int64 `json:"lastRefreshTime,omitempty,string"`
@@ -3920,7 +4768,12 @@ type MaterializedViewDefinition struct {
 	// Query: [Required] A query whose result is persisted.
 	Query string `json:"query,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "LastRefreshTime") to
+	// RefreshIntervalMs: [Optional] [TrustedTester] The maximum frequency
+	// at which this materialized view will be refreshed. The default value
+	// is "1800000" (30 minutes).
+	RefreshIntervalMs int64 `json:"refreshIntervalMs,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g. "EnableRefresh") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -3928,13 +4781,12 @@ type MaterializedViewDefinition struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "LastRefreshTime") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
+	// NullFields is a list of field names (e.g. "EnableRefresh") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
 	NullFields []string `json:"-"`
 }
 
@@ -3945,6 +4797,9 @@ func (s *MaterializedViewDefinition) MarshalJSON() ([]byte, error) {
 }
 
 type Model struct {
+	// BestTrialId: The best trial_id across all training runs.
+	BestTrialId int64 `json:"bestTrialId,omitempty,string"`
+
 	// CreationTime: Output only. The time when this model was created, in
 	// millisecs since the epoch.
 	CreationTime int64 `json:"creationTime,omitempty,string"`
@@ -3953,24 +4808,20 @@ type Model struct {
 	Description string `json:"description,omitempty"`
 
 	// EncryptionConfiguration: Custom encryption configuration (e.g., Cloud
-	// KMS keys). This shows the
-	// encryption configuration of the model data while stored in
-	// BigQuery
-	// storage.
+	// KMS keys). This shows the encryption configuration of the model data
+	// while stored in BigQuery storage. This field can be used with
+	// PatchModel to update encryption key for an already encrypted model.
 	EncryptionConfiguration *EncryptionConfiguration `json:"encryptionConfiguration,omitempty"`
 
 	// Etag: Output only. A hash of this resource.
 	Etag string `json:"etag,omitempty"`
 
 	// ExpirationTime: Optional. The time when this model expires, in
-	// milliseconds since the epoch.
-	// If not present, the model will persist indefinitely. Expired
-	// models
-	// will be deleted and their storage reclaimed.  The
-	// defaultTableExpirationMs
-	// property of the encapsulating dataset can be used to set a
-	// default
-	// expirationTime on newly created models.
+	// milliseconds since the epoch. If not present, the model will persist
+	// indefinitely. Expired models will be deleted and their storage
+	// reclaimed. The defaultTableExpirationMs property of the encapsulating
+	// dataset can be used to set a default expirationTime on newly created
+	// models.
 	ExpirationTime int64 `json:"expirationTime,omitempty,string"`
 
 	// FeatureColumns: Output only. Input feature columns that were used to
@@ -3981,21 +4832,16 @@ type Model struct {
 	FriendlyName string `json:"friendlyName,omitempty"`
 
 	// LabelColumns: Output only. Label columns that were used to train this
-	// model.
-	// The output of the model will have a "predicted_" prefix to these
-	// columns.
+	// model. The output of the model will have a "predicted_" prefix to
+	// these columns.
 	LabelColumns []*StandardSqlField `json:"labelColumns,omitempty"`
 
 	// Labels: The labels associated with this model. You can use these to
-	// organize
-	// and group your models. Label keys and values can be no longer
-	// than 63 characters, can only contain lowercase letters,
-	// numeric
-	// characters, underscores and dashes. International characters are
-	// allowed.
-	// Label values are optional. Label keys must start with a letter and
-	// each
-	// label in the list must have a different key.
+	// organize and group your models. Label keys and values can be no
+	// longer than 63 characters, can only contain lowercase letters,
+	// numeric characters, underscores and dashes. International characters
+	// are allowed. Label values are optional. Label keys must start with a
+	// letter and each label in the list must have a different key.
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// LastModifiedTime: Output only. The time when this model was last
@@ -4003,8 +4849,7 @@ type Model struct {
 	LastModifiedTime int64 `json:"lastModifiedTime,omitempty,string"`
 
 	// Location: Output only. The geographic location where the model
-	// resides. This value
-	// is inherited from the dataset.
+	// resides. This value is inherited from the dataset.
 	Location string `json:"location,omitempty"`
 
 	// ModelReference: Required. Unique identifier for this model.
@@ -4018,7 +4863,15 @@ type Model struct {
 	//   "LOGISTIC_REGRESSION" - Logistic regression based classification
 	// model.
 	//   "KMEANS" - K-means clustering model.
-	//   "TENSORFLOW" - [Beta] An imported TensorFlow model.
+	//   "MATRIX_FACTORIZATION" - Matrix factorization model.
+	//   "DNN_CLASSIFIER" - DNN classifier model.
+	//   "TENSORFLOW" - An imported TensorFlow model.
+	//   "DNN_REGRESSOR" - DNN regressor model.
+	//   "BOOSTED_TREE_REGRESSOR" - Boosted tree regressor model.
+	//   "BOOSTED_TREE_CLASSIFIER" - Boosted tree classifier model.
+	//   "ARIMA" - ARIMA model.
+	//   "AUTOML_REGRESSOR" - [Beta] AutoML Tables regression model.
+	//   "AUTOML_CLASSIFIER" - [Beta] AutoML Tables classification model.
 	ModelType string `json:"modelType,omitempty"`
 
 	// TrainingRuns: Output only. Information for all training runs in
@@ -4029,7 +4882,7 @@ type Model struct {
 	// server.
 	googleapi.ServerResponse `json:"-"`
 
-	// ForceSendFields is a list of field names (e.g. "CreationTime") to
+	// ForceSendFields is a list of field names (e.g. "BestTrialId") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -4037,7 +4890,7 @@ type Model struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "CreationTime") to include
+	// NullFields is a list of field names (e.g. "BestTrialId") to include
 	// in API requests with the JSON null value. By default, fields with
 	// empty values are omitted from API requests. However, any field with
 	// an empty value appearing in NullFields will be sent to the server as
@@ -4189,6 +5042,206 @@ func (s *MultiClassClassificationMetrics) MarshalJSON() ([]byte, error) {
 	type NoMethod MultiClassClassificationMetrics
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type ParquetOptions struct {
+	// EnableListInference: [Optional] Indicates whether to use schema
+	// inference specifically for Parquet LIST logical type.
+	EnableListInference bool `json:"enableListInference,omitempty"`
+
+	// EnumAsString: [Optional] Indicates whether to infer Parquet ENUM
+	// logical type as STRING instead of BYTES by default.
+	EnumAsString bool `json:"enumAsString,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "EnableListInference")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "EnableListInference") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ParquetOptions) MarshalJSON() ([]byte, error) {
+	type NoMethod ParquetOptions
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// Policy: An Identity and Access Management (IAM) policy, which
+// specifies access controls for Google Cloud resources. A `Policy` is a
+// collection of `bindings`. A `binding` binds one or more `members` to
+// a single `role`. Members can be user accounts, service accounts,
+// Google groups, and domains (such as G Suite). A `role` is a named
+// list of permissions; each `role` can be an IAM predefined role or a
+// user-created custom role. For some types of Google Cloud resources, a
+// `binding` can also specify a `condition`, which is a logical
+// expression that allows access to a resource only if the expression
+// evaluates to `true`. A condition can add constraints based on
+// attributes of the request, the resource, or both. To learn which
+// resources support conditions in their IAM policies, see the IAM
+// documentation
+// (https://cloud.google.com/iam/help/conditions/resource-policies).
+// **JSON example:** { "bindings": [ { "role":
+// "roles/resourcemanager.organizationAdmin", "members": [
+// "user:mike@example.com", "group:admins@example.com",
+// "domain:google.com",
+// "serviceAccount:my-project-id@appspot.gserviceaccount.com" ] }, {
+// "role": "roles/resourcemanager.organizationViewer", "members": [
+// "user:eve@example.com" ], "condition": { "title": "expirable access",
+// "description": "Does not grant access after Sep 2020", "expression":
+// "request.time < timestamp('2020-10-01T00:00:00.000Z')", } } ],
+// "etag": "BwWWja0YfJA=", "version": 3 } **YAML example:** bindings: -
+// members: - user:mike@example.com - group:admins@example.com -
+// domain:google.com -
+// serviceAccount:my-project-id@appspot.gserviceaccount.com role:
+// roles/resourcemanager.organizationAdmin - members: -
+// user:eve@example.com role: roles/resourcemanager.organizationViewer
+// condition: title: expirable access description: Does not grant access
+// after Sep 2020 expression: request.time <
+// timestamp('2020-10-01T00:00:00.000Z') - etag: BwWWja0YfJA= - version:
+// 3 For a description of IAM and its features, see the IAM
+// documentation (https://cloud.google.com/iam/docs/).
+type Policy struct {
+	// AuditConfigs: Specifies cloud audit logging configuration for this
+	// policy.
+	AuditConfigs []*AuditConfig `json:"auditConfigs,omitempty"`
+
+	// Bindings: Associates a list of `members` to a `role`. Optionally, may
+	// specify a `condition` that determines how and when the `bindings` are
+	// applied. Each of the `bindings` must contain at least one member.
+	Bindings []*Binding `json:"bindings,omitempty"`
+
+	// Etag: `etag` is used for optimistic concurrency control as a way to
+	// help prevent simultaneous updates of a policy from overwriting each
+	// other. It is strongly suggested that systems make use of the `etag`
+	// in the read-modify-write cycle to perform policy updates in order to
+	// avoid race conditions: An `etag` is returned in the response to
+	// `getIamPolicy`, and systems are expected to put that etag in the
+	// request to `setIamPolicy` to ensure that their change will be applied
+	// to the same version of the policy. **Important:** If you use IAM
+	// Conditions, you must include the `etag` field whenever you call
+	// `setIamPolicy`. If you omit this field, then IAM allows you to
+	// overwrite a version `3` policy with a version `1` policy, and all of
+	// the conditions in the version `3` policy are lost.
+	Etag string `json:"etag,omitempty"`
+
+	// Version: Specifies the format of the policy. Valid values are `0`,
+	// `1`, and `3`. Requests that specify an invalid value are rejected.
+	// Any operation that affects conditional role bindings must specify
+	// version `3`. This requirement applies to the following operations: *
+	// Getting a policy that includes a conditional role binding * Adding a
+	// conditional role binding to a policy * Changing a conditional role
+	// binding in a policy * Removing any role binding, with or without a
+	// condition, from a policy that includes conditions **Important:** If
+	// you use IAM Conditions, you must include the `etag` field whenever
+	// you call `setIamPolicy`. If you omit this field, then IAM allows you
+	// to overwrite a version `3` policy with a version `1` policy, and all
+	// of the conditions in the version `3` policy are lost. If a policy
+	// does not include any conditions, operations on that policy may
+	// specify any valid version or leave the field unset. To learn which
+	// resources support conditions in their IAM policies, see the IAM
+	// documentation
+	// (https://cloud.google.com/iam/help/conditions/resource-policies).
+	Version int64 `json:"version,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "AuditConfigs") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AuditConfigs") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Policy) MarshalJSON() ([]byte, error) {
+	type NoMethod Policy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// PrincipalComponentInfo: Principal component infos, used only for
+// eigen decomposition based models, e.g., PCA. Ordered by
+// explained_variance in the descending order.
+type PrincipalComponentInfo struct {
+	// CumulativeExplainedVarianceRatio: The explained_variance is
+	// pre-ordered in the descending order to compute the cumulative
+	// explained variance ratio.
+	CumulativeExplainedVarianceRatio float64 `json:"cumulativeExplainedVarianceRatio,omitempty"`
+
+	// ExplainedVariance: Explained variance by this principal component,
+	// which is simply the eigenvalue.
+	ExplainedVariance float64 `json:"explainedVariance,omitempty"`
+
+	// ExplainedVarianceRatio: Explained_variance over the total explained
+	// variance.
+	ExplainedVarianceRatio float64 `json:"explainedVarianceRatio,omitempty"`
+
+	// PrincipalComponentId: Id of the principal component.
+	PrincipalComponentId int64 `json:"principalComponentId,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "CumulativeExplainedVarianceRatio") to unconditionally include in API
+	// requests. By default, fields with empty values are omitted from API
+	// requests. However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g.
+	// "CumulativeExplainedVarianceRatio") to include in API requests with
+	// the JSON null value. By default, fields with empty values are omitted
+	// from API requests. However, any field with an empty value appearing
+	// in NullFields will be sent to the server as null. It is an error if a
+	// field in this list has a non-empty value. This may be used to include
+	// null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *PrincipalComponentInfo) MarshalJSON() ([]byte, error) {
+	type NoMethod PrincipalComponentInfo
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *PrincipalComponentInfo) UnmarshalJSON(data []byte) error {
+	type NoMethod PrincipalComponentInfo
+	var s1 struct {
+		CumulativeExplainedVarianceRatio gensupport.JSONFloat64 `json:"cumulativeExplainedVarianceRatio"`
+		ExplainedVariance                gensupport.JSONFloat64 `json:"explainedVariance"`
+		ExplainedVarianceRatio           gensupport.JSONFloat64 `json:"explainedVarianceRatio"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.CumulativeExplainedVarianceRatio = float64(s1.CumulativeExplainedVarianceRatio)
+	s.ExplainedVariance = float64(s1.ExplainedVariance)
+	s.ExplainedVarianceRatio = float64(s1.ExplainedVarianceRatio)
+	return nil
 }
 
 type ProjectList struct {
@@ -4438,6 +5491,15 @@ func (s *QueryParameterValue) MarshalJSON() ([]byte, error) {
 }
 
 type QueryRequest struct {
+	// ConnectionProperties: Connection properties.
+	ConnectionProperties []*ConnectionProperty `json:"connectionProperties,omitempty"`
+
+	// CreateSession: If true, creates a new session, where session id will
+	// be a server generated random id. If false, runs query with an
+	// existing session_id passed in ConnectionProperty, otherwise runs
+	// query in non-session mode.
+	CreateSession bool `json:"createSession,omitempty"`
+
 	// DefaultDataset: [Optional] Specifies the default datasetId and
 	// projectId to assume for any unqualified table names in the query. If
 	// not set, all table names in the query string must be qualified in the
@@ -4453,6 +5515,14 @@ type QueryRequest struct {
 	// Kind: The resource type of the request.
 	Kind string `json:"kind,omitempty"`
 
+	// Labels: The labels associated with this job. You can use these to
+	// organize and group your jobs. Label keys and values can be no longer
+	// than 63 characters, can only contain lowercase letters, numeric
+	// characters, underscores and dashes. International characters are
+	// allowed. Label values are optional. Label keys must start with a
+	// letter and each label in the list must have a different key.
+	Labels map[string]string `json:"labels,omitempty"`
+
 	// Location: The geographic location where the job should run. See
 	// details at
 	// https://cloud.google.com/bigquery/docs/locations#specifying_your_location.
@@ -4465,6 +5535,12 @@ type QueryRequest struct {
 	// also limited to 10 MB. By default, there is no maximum row count, and
 	// only the byte limit applies.
 	MaxResults int64 `json:"maxResults,omitempty"`
+
+	// MaximumBytesBilled: [Optional] Limits the bytes billed for this job.
+	// Queries that will have bytes billed beyond this limit will fail
+	// (without incurring a charge). If unspecified, this will be set to
+	// your project default.
+	MaximumBytesBilled int64 `json:"maximumBytesBilled,omitempty,string"`
 
 	// ParameterMode: Standard SQL only. Set to POSITIONAL to use positional
 	// (?) query parameters or to NAMED to use named (@myparam) query
@@ -4481,6 +5557,29 @@ type QueryRequest struct {
 
 	// QueryParameters: Query parameters for Standard SQL queries.
 	QueryParameters []*QueryParameter `json:"queryParameters,omitempty"`
+
+	// RequestId: A unique user provided identifier to ensure idempotent
+	// behavior for queries. Note that this is different from the job_id. It
+	// has the following properties: 1. It is case-sensitive, limited to up
+	// to 36 ASCII characters. A UUID is recommended. 2. Read only queries
+	// can ignore this token since they are nullipotent by definition. 3.
+	// For the purposes of idempotency ensured by the request_id, a request
+	// is considered duplicate of another only if they have the same
+	// request_id and are actually duplicates. When determining whether a
+	// request is a duplicate of the previous request, all parameters in the
+	// request that may affect the behavior are considered. For example,
+	// query, connection_properties, query_parameters, use_legacy_sql are
+	// parameters that affect the result and are considered when determining
+	// whether a request is a duplicate, but properties like timeout_ms
+	// don't affect the result and are thus not considered. Dry run query
+	// requests are never considered duplicate of another request. 4. When a
+	// duplicate mutating query request is detected, it returns: a. the
+	// results of the mutation if it completes successfully within the
+	// timeout. b. the running operation if it is still in progress at the
+	// end of the timeout. 5. Its lifetime is limited to 15 minutes. In
+	// other words, if two requests are sent with the same request_id, but
+	// more than 15 minutes apart, idempotency is not guaranteed.
+	RequestId string `json:"requestId,omitempty"`
 
 	// TimeoutMs: [Optional] How long to wait for the query to complete, in
 	// milliseconds, before the request times out and returns. Note that
@@ -4508,15 +5607,16 @@ type QueryRequest struct {
 	// Default: true
 	UseQueryCache *bool `json:"useQueryCache,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "DefaultDataset") to
-	// unconditionally include in API requests. By default, fields with
-	// empty values are omitted from API requests. However, any non-pointer,
-	// non-interface field appearing in ForceSendFields will be sent to the
-	// server regardless of whether the field is empty or not. This may be
-	// used to include empty fields in Patch requests.
+	// ForceSendFields is a list of field names (e.g.
+	// "ConnectionProperties") to unconditionally include in API requests.
+	// By default, fields with empty values are omitted from API requests.
+	// However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "DefaultDataset") to
+	// NullFields is a list of field names (e.g. "ConnectionProperties") to
 	// include in API requests with the JSON null value. By default, fields
 	// with empty values are omitted from API requests. However, any field
 	// with an empty value appearing in NullFields will be sent to the
@@ -4574,6 +5674,10 @@ type QueryResponse struct {
 	// Schema: The schema of the results. Present only when the query
 	// completes successfully.
 	Schema *TableSchema `json:"schema,omitempty"`
+
+	// SessionInfoTemplate: [Output-only] [Preview] Information of the
+	// session if this job is part of one.
+	SessionInfoTemplate *SessionInfo `json:"sessionInfoTemplate,omitempty"`
 
 	// TotalBytesProcessed: The total number of bytes processed for this
 	// query. If this query was a dry run, this is the number of bytes that
@@ -4724,9 +5828,76 @@ func (s *RangePartitioningRange) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// RankingMetrics: Evaluation metrics used by weighted-ALS models
+// specified by feedback_type=implicit.
+type RankingMetrics struct {
+	// AverageRank: Determines the goodness of a ranking by computing the
+	// percentile rank from the predicted confidence and dividing it by the
+	// original rank.
+	AverageRank float64 `json:"averageRank,omitempty"`
+
+	// MeanAveragePrecision: Calculates a precision per user for all the
+	// items by ranking them and then averages all the precisions across all
+	// the users.
+	MeanAveragePrecision float64 `json:"meanAveragePrecision,omitempty"`
+
+	// MeanSquaredError: Similar to the mean squared error computed in
+	// regression and explicit recommendation models except instead of
+	// computing the rating directly, the output from evaluate is computed
+	// against a preference which is 1 or 0 depending on if the rating
+	// exists or not.
+	MeanSquaredError float64 `json:"meanSquaredError,omitempty"`
+
+	// NormalizedDiscountedCumulativeGain: A metric to determine the
+	// goodness of a ranking calculated from the predicted confidence by
+	// comparing it to an ideal rank measured by the original ratings.
+	NormalizedDiscountedCumulativeGain float64 `json:"normalizedDiscountedCumulativeGain,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AverageRank") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AverageRank") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *RankingMetrics) MarshalJSON() ([]byte, error) {
+	type NoMethod RankingMetrics
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *RankingMetrics) UnmarshalJSON(data []byte) error {
+	type NoMethod RankingMetrics
+	var s1 struct {
+		AverageRank                        gensupport.JSONFloat64 `json:"averageRank"`
+		MeanAveragePrecision               gensupport.JSONFloat64 `json:"meanAveragePrecision"`
+		MeanSquaredError                   gensupport.JSONFloat64 `json:"meanSquaredError"`
+		NormalizedDiscountedCumulativeGain gensupport.JSONFloat64 `json:"normalizedDiscountedCumulativeGain"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.AverageRank = float64(s1.AverageRank)
+	s.MeanAveragePrecision = float64(s1.MeanAveragePrecision)
+	s.MeanSquaredError = float64(s1.MeanSquaredError)
+	s.NormalizedDiscountedCumulativeGain = float64(s1.NormalizedDiscountedCumulativeGain)
+	return nil
+}
+
 // RegressionMetrics: Evaluation metrics for regression and explicit
-// feedback type matrix
-// factorization models.
+// feedback type matrix factorization models.
 type RegressionMetrics struct {
 	// MeanAbsoluteError: Mean absolute error.
 	MeanAbsoluteError float64 `json:"meanAbsoluteError,omitempty"`
@@ -4740,7 +5911,7 @@ type RegressionMetrics struct {
 	// MedianAbsoluteError: Median absolute error.
 	MedianAbsoluteError float64 `json:"medianAbsoluteError,omitempty"`
 
-	// RSquared: R^2 score.
+	// RSquared: R^2 score. This corresponds to r2_score in ML.EVALUATE.
 	RSquared float64 `json:"rSquared,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "MeanAbsoluteError")
@@ -4795,52 +5966,43 @@ type Routine struct {
 	Arguments []*Argument `json:"arguments,omitempty"`
 
 	// CreationTime: Output only. The time when this routine was created, in
-	// milliseconds since
-	// the epoch.
+	// milliseconds since the epoch.
 	CreationTime int64 `json:"creationTime,omitempty,string"`
 
-	// DefinitionBody: Required. The body of the routine.
-	//
-	// For functions, this is the expression in the AS clause.
-	//
-	// If language=SQL, it is the substring inside (but excluding)
-	// the
-	// parentheses. For example, for the function created with the
-	// following
-	// statement:
-	//
-	// `CREATE FUNCTION JoinLines(x string, y string) as (concat(x, "\n",
-	// y))`
-	//
-	// The definition_body is `concat(x, "\n", y)` (\n is not replaced
-	// with
-	// linebreak).
-	//
-	// If language=JAVASCRIPT, it is the evaluated string in the AS
-	// clause.
-	// For example, for the function created with the following
-	// statement:
-	//
-	// `CREATE FUNCTION f() RETURNS STRING LANGUAGE js AS 'return
-	// "\n";\n'`
-	//
-	// The definition_body is
-	//
-	// `return "\n";\n`
-	//
-	// Note that both \n are replaced with linebreaks.
+	// DefinitionBody: Required. The body of the routine. For functions,
+	// this is the expression in the AS clause. If language=SQL, it is the
+	// substring inside (but excluding) the parentheses. For example, for
+	// the function created with the following statement: `CREATE FUNCTION
+	// JoinLines(x string, y string) as (concat(x, "\n", y))` The
+	// definition_body is `concat(x, "\n", y)` (\n is not replaced with
+	// linebreak). If language=JAVASCRIPT, it is the evaluated string in the
+	// AS clause. For example, for the function created with the following
+	// statement: `CREATE FUNCTION f() RETURNS STRING LANGUAGE js AS 'return
+	// "\n";\n'` The definition_body is `return "\n";\n` Note that both \n
+	// are replaced with linebreaks.
 	DefinitionBody string `json:"definitionBody,omitempty"`
 
 	// Description: Optional. [Experimental] The description of the routine
 	// if defined.
 	Description string `json:"description,omitempty"`
 
+	// DeterminismLevel: Optional. [Experimental] The determinism level of
+	// the JavaScript UDF if defined.
+	//
+	// Possible values:
+	//   "DETERMINISM_LEVEL_UNSPECIFIED" - The determinism of the UDF is
+	// unspecified.
+	//   "DETERMINISTIC" - The UDF is deterministic, meaning that 2 function
+	// calls with the same inputs always produce the same result, even
+	// across 2 query runs.
+	//   "NOT_DETERMINISTIC" - The UDF is not deterministic.
+	DeterminismLevel string `json:"determinismLevel,omitempty"`
+
 	// Etag: Output only. A hash of this resource.
 	Etag string `json:"etag,omitempty"`
 
 	// ImportedLibraries: Optional. If language = "JAVASCRIPT", this field
-	// stores the path of the
-	// imported JAVASCRIPT libraries.
+	// stores the path of the imported JAVASCRIPT libraries.
 	ImportedLibraries []string `json:"importedLibraries,omitempty"`
 
 	// Language: Optional. Defaults to "SQL".
@@ -4852,41 +6014,28 @@ type Routine struct {
 	Language string `json:"language,omitempty"`
 
 	// LastModifiedTime: Output only. The time when this routine was last
-	// modified, in milliseconds
-	// since the epoch.
+	// modified, in milliseconds since the epoch.
 	LastModifiedTime int64 `json:"lastModifiedTime,omitempty,string"`
 
-	// ReturnType: Optional if language = "SQL"; required otherwise.
-	//
-	// If absent, the return type is inferred from definition_body at query
-	// time
-	// in each query that references this routine. If present, then the
-	// evaluated
-	// result will be cast to the specified returned type at query
-	// time.
-	//
-	// For example, for the functions created with the following
-	// statements:
-	//
-	// * `CREATE FUNCTION Add(x FLOAT64, y FLOAT64) RETURNS FLOAT64 AS (x +
-	// y);`
-	//
-	// * `CREATE FUNCTION Increment(x FLOAT64) AS (Add(x, 1));`
-	//
-	// * `CREATE FUNCTION Decrement(x FLOAT64) RETURNS FLOAT64 AS (Add(x,
-	// -1));`
-	//
-	// The return_type is `{type_kind: "FLOAT64"}` for `Add` and
-	// `Decrement`, and
-	// is absent for `Increment` (inferred as FLOAT64 at query
-	// time).
-	//
-	// Suppose the function `Add` is replaced by
-	//   `CREATE OR REPLACE FUNCTION Add(x INT64, y INT64) AS (x +
-	// y);`
-	//
-	// Then the inferred return type of `Increment` is automatically changed
-	// to
+	// ReturnTableType: Optional. Set only if Routine is a
+	// "TABLE_VALUED_FUNCTION". TODO(b/173344646) - Update return_type
+	// documentation to say it cannot be set for TABLE_VALUED_FUNCTION
+	// before preview launch.
+	ReturnTableType *StandardSqlTableType `json:"returnTableType,omitempty"`
+
+	// ReturnType: Optional if language = "SQL"; required otherwise. If
+	// absent, the return type is inferred from definition_body at query
+	// time in each query that references this routine. If present, then the
+	// evaluated result will be cast to the specified returned type at query
+	// time. For example, for the functions created with the following
+	// statements: * `CREATE FUNCTION Add(x FLOAT64, y FLOAT64) RETURNS
+	// FLOAT64 AS (x + y);` * `CREATE FUNCTION Increment(x FLOAT64) AS
+	// (Add(x, 1));` * `CREATE FUNCTION Decrement(x FLOAT64) RETURNS FLOAT64
+	// AS (Add(x, -1));` The return_type is `{type_kind: "FLOAT64"}` for
+	// `Add` and `Decrement`, and is absent for `Increment` (inferred as
+	// FLOAT64 at query time). Suppose the function `Add` is replaced by
+	// `CREATE OR REPLACE FUNCTION Add(x INT64, y INT64) AS (x + y);` Then
+	// the inferred return type of `Increment` is automatically changed to
 	// INT64 at query time, while the return type of `Decrement` remains
 	// FLOAT64.
 	ReturnType *StandardSqlDataType `json:"returnType,omitempty"`
@@ -4901,6 +6050,7 @@ type Routine struct {
 	//   "ROUTINE_TYPE_UNSPECIFIED"
 	//   "SCALAR_FUNCTION" - Non-builtin permanent scalar function.
 	//   "PROCEDURE" - Stored procedure.
+	//   "TABLE_VALUED_FUNCTION" - Non-builtin permanent TVF.
 	RoutineType string `json:"routineType,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -4996,6 +6146,127 @@ func (s *Row) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// RowAccessPolicy: Represents access on a subset of rows on the
+// specified table, defined by its filter predicate. Access to the
+// subset of rows is controlled by its IAM policy.
+type RowAccessPolicy struct {
+	// CreationTime: Output only. The time when this row access policy was
+	// created, in milliseconds since the epoch.
+	CreationTime string `json:"creationTime,omitempty"`
+
+	// Etag: Output only. A hash of this resource.
+	Etag string `json:"etag,omitempty"`
+
+	// FilterPredicate: Required. A SQL boolean expression that represents
+	// the rows defined by this row access policy, similar to the boolean
+	// expression in a WHERE clause of a SELECT query on a table. References
+	// to other tables, routines, and temporary functions are not supported.
+	// Examples: region="EU" date_field = CAST('2019-9-27' as DATE)
+	// nullable_field is not NULL numeric_field BETWEEN 1.0 AND 5.0
+	FilterPredicate string `json:"filterPredicate,omitempty"`
+
+	// LastModifiedTime: Output only. The time when this row access policy
+	// was last modified, in milliseconds since the epoch.
+	LastModifiedTime string `json:"lastModifiedTime,omitempty"`
+
+	// RowAccessPolicyReference: Required. Reference describing the ID of
+	// this row access policy.
+	RowAccessPolicyReference *RowAccessPolicyReference `json:"rowAccessPolicyReference,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "CreationTime") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "CreationTime") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *RowAccessPolicy) MarshalJSON() ([]byte, error) {
+	type NoMethod RowAccessPolicy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type RowAccessPolicyReference struct {
+	// DatasetId: [Required] The ID of the dataset containing this row
+	// access policy.
+	DatasetId string `json:"datasetId,omitempty"`
+
+	// PolicyId: [Required] The ID of the row access policy. The ID must
+	// contain only letters (a-z, A-Z), numbers (0-9), or underscores (_).
+	// The maximum length is 256 characters.
+	PolicyId string `json:"policyId,omitempty"`
+
+	// ProjectId: [Required] The ID of the project containing this row
+	// access policy.
+	ProjectId string `json:"projectId,omitempty"`
+
+	// TableId: [Required] The ID of the table containing this row access
+	// policy.
+	TableId string `json:"tableId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "DatasetId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "DatasetId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *RowAccessPolicyReference) MarshalJSON() ([]byte, error) {
+	type NoMethod RowAccessPolicyReference
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type RowLevelSecurityStatistics struct {
+	// RowLevelSecurityApplied: [Output-only] [Preview] Whether any accessed
+	// data was protected by row access policies.
+	RowLevelSecurityApplied bool `json:"rowLevelSecurityApplied,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "RowLevelSecurityApplied") to unconditionally include in API
+	// requests. By default, fields with empty values are omitted from API
+	// requests. However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "RowLevelSecurityApplied")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *RowLevelSecurityStatistics) MarshalJSON() ([]byte, error) {
+	type NoMethod RowLevelSecurityStatistics
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type ScriptStackFrame struct {
 	// EndColumn: [Output-only] One-based end column.
 	EndColumn int64 `json:"endColumn,omitempty"`
@@ -5074,18 +6345,109 @@ func (s *ScriptStatistics) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type SessionInfo struct {
+	// SessionId: [Output-only] // [Preview] Id of the session.
+	SessionId string `json:"sessionId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "SessionId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "SessionId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SessionInfo) MarshalJSON() ([]byte, error) {
+	type NoMethod SessionInfo
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// SetIamPolicyRequest: Request message for `SetIamPolicy` method.
+type SetIamPolicyRequest struct {
+	// Policy: REQUIRED: The complete policy to be applied to the
+	// `resource`. The size of the policy is limited to a few 10s of KB. An
+	// empty policy is a valid policy but certain Cloud Platform services
+	// (such as Projects) might reject them.
+	Policy *Policy `json:"policy,omitempty"`
+
+	// UpdateMask: OPTIONAL: A FieldMask specifying which fields of the
+	// policy to modify. Only the fields in the mask will be modified. If no
+	// mask is provided, the following default mask is used: `paths:
+	// "bindings, etag"
+	UpdateMask string `json:"updateMask,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Policy") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Policy") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SetIamPolicyRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod SetIamPolicyRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type SnapshotDefinition struct {
+	// BaseTableReference: [Required] Reference describing the ID of the
+	// table that is snapshotted.
+	BaseTableReference *TableReference `json:"baseTableReference,omitempty"`
+
+	// SnapshotTime: [Required] The time at which the base table was
+	// snapshot.
+	SnapshotTime string `json:"snapshotTime,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "BaseTableReference")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "BaseTableReference") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SnapshotDefinition) MarshalJSON() ([]byte, error) {
+	type NoMethod SnapshotDefinition
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // StandardSqlDataType: The type of a variable, e.g., a function
-// argument.
-// Examples:
-// INT64: {type_kind="INT64"}
-// ARRAY<STRING>: {type_kind="ARRAY",
-// array_element_type="STRING"}
-// STRUCT<x STRING, y ARRAY<DATE>>:
-//   {type_kind="STRUCT",
-//    struct_type={fields=[
-//      {name="x", type={type_kind="STRING"}},
-//      {name="y", type={type_kind="ARRAY", array_element_type="DATE"}}
-//    ]}}
+// argument. Examples: INT64: {type_kind="INT64"} ARRAY:
+// {type_kind="ARRAY", array_element_type="STRING"} STRUCT>:
+// {type_kind="STRUCT", struct_type={fields=[ {name="x",
+// type={type_kind="STRING"}}, {name="y", type={type_kind="ARRAY",
+// array_element_type="DATE"}} ]}}
 type StandardSqlDataType struct {
 	// ArrayElementType: The type of the array's elements, if type_kind =
 	// "ARRAY".
@@ -5095,8 +6457,8 @@ type StandardSqlDataType struct {
 	// "STRUCT".
 	StructType *StandardSqlStructType `json:"structType,omitempty"`
 
-	// TypeKind: Required. The top level type of this field.
-	// Can be any standard SQL data type (e.g., "INT64", "DATE", "ARRAY").
+	// TypeKind: Required. The top level type of this field. Can be any
+	// standard SQL data type (e.g., "INT64", "DATE", "ARRAY").
 	//
 	// Possible values:
 	//   "TYPE_KIND_UNSPECIFIED" - Invalid type.
@@ -5107,19 +6469,20 @@ type StandardSqlDataType struct {
 	//   "STRING" - Encoded as a string value.
 	//   "BYTES" - Encoded as a base64 string per RFC 4648, section 4.
 	//   "TIMESTAMP" - Encoded as an RFC 3339 timestamp with mandatory "Z"
-	// time zone string:
-	// 1985-04-12T23:20:50.52Z
+	// time zone string: 1985-04-12T23:20:50.52Z
 	//   "DATE" - Encoded as RFC 3339 full-date format string: 1985-04-12
 	//   "TIME" - Encoded as RFC 3339 partial-time format string:
 	// 23:20:50.52
 	//   "DATETIME" - Encoded as RFC 3339 full-date "T" partial-time:
 	// 1985-04-12T23:20:50.52
+	//   "INTERVAL" - Encoded as fully qualified 3 part: 0-5 15 2:30:45.6
 	//   "GEOGRAPHY" - Encoded as WKT
 	//   "NUMERIC" - Encoded as a decimal string.
+	//   "BIGNUMERIC" - Encoded as a decimal string.
 	//   "ARRAY" - Encoded as a list with types matching Type.array_type.
 	//   "STRUCT" - Encoded as a list with fields of type
-	// Type.struct_type[i]. List is used
-	// because a JSON object cannot have duplicate field names.
+	// Type.struct_type[i]. List is used because a JSON object cannot have
+	// duplicate field names.
 	TypeKind string `json:"typeKind,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ArrayElementType") to
@@ -5152,10 +6515,8 @@ type StandardSqlField struct {
 	// fields.
 	Name string `json:"name,omitempty"`
 
-	// Type: Optional. The type of this parameter. Absent if not
-	// explicitly
-	// specified (e.g., CREATE FUNCTION statement can omit the return
-	// type;
+	// Type: Optional. The type of this parameter. Absent if not explicitly
+	// specified (e.g., CREATE FUNCTION statement can omit the return type;
 	// in this case the output parameter does not have this "type" field).
 	Type *StandardSqlDataType `json:"type,omitempty"`
 
@@ -5204,6 +6565,34 @@ type StandardSqlStructType struct {
 
 func (s *StandardSqlStructType) MarshalJSON() ([]byte, error) {
 	type NoMethod StandardSqlStructType
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// StandardSqlTableType: A table type
+type StandardSqlTableType struct {
+	// Columns: The columns in this table type
+	Columns []*StandardSqlField `json:"columns,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Columns") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Columns") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *StandardSqlTableType) MarshalJSON() ([]byte, error) {
+	type NoMethod StandardSqlTableType
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -5339,9 +6728,9 @@ type Table struct {
 	// should be specified.
 	RangePartitioning *RangePartitioning `json:"rangePartitioning,omitempty"`
 
-	// RequirePartitionFilter: [Beta] [Optional] If set to true, queries
-	// over this table require a partition filter that can be used for
-	// partition elimination to be specified.
+	// RequirePartitionFilter: [Optional] If set to true, queries over this
+	// table require a partition filter that can be used for partition
+	// elimination to be specified.
 	RequirePartitionFilter bool `json:"requirePartitionFilter,omitempty"`
 
 	// Schema: [Optional] Describes the schema of this table.
@@ -5350,6 +6739,9 @@ type Table struct {
 	// SelfLink: [Output-only] A URL that can be used to access this
 	// resource again.
 	SelfLink string `json:"selfLink,omitempty"`
+
+	// SnapshotDefinition: [Output-only] Snapshot definition.
+	SnapshotDefinition *SnapshotDefinition `json:"snapshotDefinition,omitempty"`
 
 	// StreamingBuffer: [Output-only] Contains information regarding this
 	// table's streaming buffer, if one is present. This field will be
@@ -5367,10 +6759,11 @@ type Table struct {
 
 	// Type: [Output-only] Describes the table type. The following values
 	// are supported: TABLE: A normal BigQuery table. VIEW: A virtual table
-	// defined by a SQL query. [TrustedTester] MATERIALIZED_VIEW: SQL query
-	// whose result is persisted. EXTERNAL: A table that references data
-	// stored in an external storage system, such as Google Cloud Storage.
-	// The default value is TABLE.
+	// defined by a SQL query. SNAPSHOT: An immutable, read-only table that
+	// is a copy of another table. [TrustedTester] MATERIALIZED_VIEW: SQL
+	// query whose result is persisted. EXTERNAL: A table that references
+	// data stored in an external storage system, such as Google Cloud
+	// Storage. The default value is TABLE.
 	Type string `json:"type,omitempty"`
 
 	// View: [Optional] The view definition.
@@ -5450,8 +6843,8 @@ type TableDataInsertAllRequest struct {
 	// template, and inserts the rows into an instance table named
 	// "{destination}{templateSuffix}". BigQuery will manage creation of the
 	// instance table, using the schema of the base template table. See
-	// https://cloud.google.com/bigquery/streaming-data-into-bigquery#template-tables for considerations when working with templates
-	// tables.
+	// https://cloud.google.com/bigquery/streaming-data-into-bigquery#template-tables
+	// for considerations when working with templates tables.
 	TemplateSuffix string `json:"templateSuffix,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "IgnoreUnknownValues")
@@ -5635,6 +7028,15 @@ type TableFieldSchema struct {
 	// property is set to RECORD.
 	Fields []*TableFieldSchema `json:"fields,omitempty"`
 
+	// MaxLength: [Optional] Maximum length of values of this field for
+	// STRINGS or BYTES. If max_length is not specified, no maximum length
+	// constraint is imposed on this field. If type = "STRING", then
+	// max_length represents the maximum UTF-8 length of strings in this
+	// field. If type = "BYTES", then max_length represents the maximum
+	// number of bytes in this field. It is invalid to set this field if
+	// type ≠ "STRING" and ≠ "BYTES".
+	MaxLength int64 `json:"maxLength,omitempty,string"`
+
 	// Mode: [Optional] The field mode. Possible values include NULLABLE,
 	// REQUIRED and REPEATED. The default value is NULLABLE.
 	Mode string `json:"mode,omitempty"`
@@ -5644,11 +7046,37 @@ type TableFieldSchema struct {
 	// letter or underscore. The maximum length is 128 characters.
 	Name string `json:"name,omitempty"`
 
+	PolicyTags *TableFieldSchemaPolicyTags `json:"policyTags,omitempty"`
+
+	// Precision: [Optional] Precision (maximum number of total digits in
+	// base 10) and scale (maximum number of digits in the fractional part
+	// in base 10) constraints for values of this field for NUMERIC or
+	// BIGNUMERIC. It is invalid to set precision or scale if type ≠
+	// "NUMERIC" and ≠ "BIGNUMERIC". If precision and scale are not
+	// specified, no value range constraint is imposed on this field insofar
+	// as values are permitted by the type. Values of this NUMERIC or
+	// BIGNUMERIC field must be in this range when: - Precision (P) and
+	// scale (S) are specified: [-10P-S + 10-S, 10P-S - 10-S] - Precision
+	// (P) is specified but not scale (and thus scale is interpreted to be
+	// equal to zero): [-10P + 1, 10P - 1]. Acceptable values for precision
+	// and scale if both are specified: - If type = "NUMERIC": 1 ≤
+	// precision - scale ≤ 29 and 0 ≤ scale ≤ 9. - If type =
+	// "BIGNUMERIC": 1 ≤ precision - scale ≤ 38 and 0 ≤ scale ≤ 38.
+	// Acceptable values for precision if only precision is specified but
+	// not scale (and thus scale is interpreted to be equal to zero): - If
+	// type = "NUMERIC": 1 ≤ precision ≤ 29. - If type = "BIGNUMERIC": 1
+	// ≤ precision ≤ 38. If scale is specified but not precision, then
+	// it is invalid.
+	Precision int64 `json:"precision,omitempty,string"`
+
+	// Scale: [Optional] See documentation for precision.
+	Scale int64 `json:"scale,omitempty,string"`
+
 	// Type: [Required] The field data type. Possible values include STRING,
 	// BYTES, INTEGER, INT64 (same as INTEGER), FLOAT, FLOAT64 (same as
-	// FLOAT), BOOLEAN, BOOL (same as BOOLEAN), TIMESTAMP, DATE, TIME,
-	// DATETIME, RECORD (where RECORD indicates that the field contains a
-	// nested schema) or STRUCT (same as RECORD).
+	// FLOAT), NUMERIC, BIGNUMERIC, BOOLEAN, BOOL (same as BOOLEAN),
+	// TIMESTAMP, DATE, TIME, DATETIME, RECORD (where RECORD indicates that
+	// the field contains a nested schema) or STRUCT (same as RECORD).
 	Type string `json:"type,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Categories") to
@@ -5701,6 +7129,35 @@ type TableFieldSchemaCategories struct {
 
 func (s *TableFieldSchemaCategories) MarshalJSON() ([]byte, error) {
 	type NoMethod TableFieldSchemaCategories
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type TableFieldSchemaPolicyTags struct {
+	// Names: A list of category resource names. For example,
+	// "projects/1/location/eu/taxonomies/2/policyTags/3". At most 1 policy
+	// tag is allowed.
+	Names []string `json:"names,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Names") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Names") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *TableFieldSchemaPolicyTags) MarshalJSON() ([]byte, error) {
+	type NoMethod TableFieldSchemaPolicyTags
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -5775,6 +7232,10 @@ type TableListTables struct {
 	// Labels: The labels associated with this table. You can use these to
 	// organize and group your tables.
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// RangePartitioning: The range partitioning specification for this
+	// table, if configured.
+	RangePartitioning *RangePartitioning `json:"rangePartitioning,omitempty"`
 
 	// TableReference: A reference uniquely identifying the table.
 	TableReference *TableReference `json:"tableReference,omitempty"`
@@ -5931,6 +7392,72 @@ func (s *TableSchema) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// TestIamPermissionsRequest: Request message for `TestIamPermissions`
+// method.
+type TestIamPermissionsRequest struct {
+	// Permissions: The set of permissions to check for the `resource`.
+	// Permissions with wildcards (such as '*' or 'storage.*') are not
+	// allowed. For more information see IAM Overview
+	// (https://cloud.google.com/iam/docs/overview#permissions).
+	Permissions []string `json:"permissions,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Permissions") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Permissions") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *TestIamPermissionsRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod TestIamPermissionsRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// TestIamPermissionsResponse: Response message for `TestIamPermissions`
+// method.
+type TestIamPermissionsResponse struct {
+	// Permissions: A subset of `TestPermissionsRequest.permissions` that
+	// the caller is allowed.
+	Permissions []string `json:"permissions,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Permissions") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Permissions") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *TestIamPermissionsResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod TestIamPermissionsResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type TimePartitioning struct {
 	// ExpirationMs: [Optional] Number of milliseconds for which to keep the
 	// storage for partitions in the table. The storage in a partition will
@@ -5947,8 +7474,10 @@ type TimePartitioning struct {
 
 	RequirePartitionFilter bool `json:"requirePartitionFilter,omitempty"`
 
-	// Type: [Required] The only type supported is DAY, which will generate
-	// one partition per day.
+	// Type: [Required] The supported types are DAY, HOUR, MONTH, and YEAR,
+	// which will generate one partition per day, hour, month, and year,
+	// respectively. When the type is not specified, the default behavior is
+	// DAY.
 	Type string `json:"type,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ExpirationMs") to
@@ -5974,33 +7503,46 @@ func (s *TimePartitioning) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// TrainingOptions: Options used in model training.
 type TrainingOptions struct {
+	// AutoArima: Whether to enable auto ARIMA or not.
+	AutoArima bool `json:"autoArima,omitempty"`
+
+	// AutoArimaMaxOrder: The max value of non-seasonal p and q.
+	AutoArimaMaxOrder int64 `json:"autoArimaMaxOrder,omitempty,string"`
+
+	// BatchSize: Batch size for dnn models.
+	BatchSize int64 `json:"batchSize,omitempty,string"`
+
+	// DataFrequency: The data frequency of a time series.
+	//
+	// Possible values:
+	//   "DATA_FREQUENCY_UNSPECIFIED"
+	//   "AUTO_FREQUENCY" - Automatically inferred from timestamps.
+	//   "YEARLY" - Yearly data.
+	//   "QUARTERLY" - Quarterly data.
+	//   "MONTHLY" - Monthly data.
+	//   "WEEKLY" - Weekly data.
+	//   "DAILY" - Daily data.
+	//   "HOURLY" - Hourly data.
+	//   "PER_MINUTE" - Per-minute data.
+	DataFrequency string `json:"dataFrequency,omitempty"`
+
 	// DataSplitColumn: The column to split data with. This column won't be
-	// used as a
-	// feature.
-	// 1. When data_split_method is CUSTOM, the corresponding column
-	// should
-	// be boolean. The rows with true value tag are eval data, and the
-	// false
-	// are training data.
-	// 2. When data_split_method is SEQ, the first
-	// DATA_SPLIT_EVAL_FRACTION
-	// rows (from smallest to largest) in the corresponding column are
-	// used
-	// as training data, and the rest are eval data. It respects the
-	// order
-	// in Orderable data
-	// types:
-	// https://cloud.google.com/bigquery/docs/reference/standard-sql/d
-	// ata-types#data-type-properties
+	// used as a feature. 1. When data_split_method is CUSTOM, the
+	// corresponding column should be boolean. The rows with true value tag
+	// are eval data, and the false are training data. 2. When
+	// data_split_method is SEQ, the first DATA_SPLIT_EVAL_FRACTION rows
+	// (from smallest to largest) in the corresponding column are used as
+	// training data, and the rest are eval data. It respects the order in
+	// Orderable data types:
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#data-type-properties
 	DataSplitColumn string `json:"dataSplitColumn,omitempty"`
 
 	// DataSplitEvalFraction: The fraction of evaluation data over the whole
-	// input data. The rest
-	// of data will be used as training data. The format should be
-	// double.
-	// Accurate to two decimal places.
-	// Default value is 0.2.
+	// input data. The rest of data will be used as training data. The
+	// format should be double. Accurate to two decimal places. Default
+	// value is 0.2.
 	DataSplitEvalFraction float64 `json:"dataSplitEvalFraction,omitempty"`
 
 	// DataSplitMethod: The data split type for training and evaluation,
@@ -6013,8 +7555,7 @@ type TrainingOptions struct {
 	//   "SEQUENTIAL" - Splits data sequentially.
 	//   "NO_SPLIT" - Data split will be skipped.
 	//   "AUTO_SPLIT" - Splits data automatically: Uses NO_SPLIT if the data
-	// size is small.
-	// Otherwise uses RANDOM.
+	// size is small. Otherwise uses RANDOM.
 	DataSplitMethod string `json:"dataSplitMethod,omitempty"`
 
 	// DistanceType: Distance type for clustering models.
@@ -6025,35 +7566,134 @@ type TrainingOptions struct {
 	//   "COSINE" - Cosine distance.
 	DistanceType string `json:"distanceType,omitempty"`
 
+	// Dropout: Dropout probability for dnn models.
+	Dropout float64 `json:"dropout,omitempty"`
+
 	// EarlyStop: Whether to stop early when the loss doesn't improve
-	// significantly
-	// any more (compared to min_relative_progress). Used only for
-	// iterative
-	// training algorithms.
+	// significantly any more (compared to min_relative_progress). Used only
+	// for iterative training algorithms.
 	EarlyStop bool `json:"earlyStop,omitempty"`
 
+	// FeedbackType: Feedback type that specifies which algorithm to run for
+	// matrix factorization.
+	//
+	// Possible values:
+	//   "FEEDBACK_TYPE_UNSPECIFIED"
+	//   "IMPLICIT" - Use weighted-als for implicit feedback problems.
+	//   "EXPLICIT" - Use nonweighted-als for explicit feedback problems.
+	FeedbackType string `json:"feedbackType,omitempty"`
+
+	// HiddenUnits: Hidden units for dnn models.
+	HiddenUnits googleapi.Int64s `json:"hiddenUnits,omitempty"`
+
+	// HolidayRegion: The geographical region based on which the holidays
+	// are considered in time series modeling. If a valid value is
+	// specified, then holiday effects modeling is enabled.
+	//
+	// Possible values:
+	//   "HOLIDAY_REGION_UNSPECIFIED" - Holiday region unspecified.
+	//   "GLOBAL" - Global.
+	//   "NA" - North America.
+	//   "JAPAC" - Japan and Asia Pacific: Korea, Greater China, India,
+	// Australia, and New Zealand.
+	//   "EMEA" - Europe, the Middle East and Africa.
+	//   "LAC" - Latin America and the Caribbean.
+	//   "AE" - United Arab Emirates
+	//   "AR" - Argentina
+	//   "AT" - Austria
+	//   "AU" - Australia
+	//   "BE" - Belgium
+	//   "BR" - Brazil
+	//   "CA" - Canada
+	//   "CH" - Switzerland
+	//   "CL" - Chile
+	//   "CN" - China
+	//   "CO" - Colombia
+	//   "CS" - Czechoslovakia
+	//   "CZ" - Czech Republic
+	//   "DE" - Germany
+	//   "DK" - Denmark
+	//   "DZ" - Algeria
+	//   "EC" - Ecuador
+	//   "EE" - Estonia
+	//   "EG" - Egypt
+	//   "ES" - Spain
+	//   "FI" - Finland
+	//   "FR" - France
+	//   "GB" - Great Britain (United Kingdom)
+	//   "GR" - Greece
+	//   "HK" - Hong Kong
+	//   "HU" - Hungary
+	//   "ID" - Indonesia
+	//   "IE" - Ireland
+	//   "IL" - Israel
+	//   "IN" - India
+	//   "IR" - Iran
+	//   "IT" - Italy
+	//   "JP" - Japan
+	//   "KR" - Korea (South)
+	//   "LV" - Latvia
+	//   "MA" - Morocco
+	//   "MX" - Mexico
+	//   "MY" - Malaysia
+	//   "NG" - Nigeria
+	//   "NL" - Netherlands
+	//   "NO" - Norway
+	//   "NZ" - New Zealand
+	//   "PE" - Peru
+	//   "PH" - Philippines
+	//   "PK" - Pakistan
+	//   "PL" - Poland
+	//   "PT" - Portugal
+	//   "RO" - Romania
+	//   "RS" - Serbia
+	//   "RU" - Russian Federation
+	//   "SA" - Saudi Arabia
+	//   "SE" - Sweden
+	//   "SG" - Singapore
+	//   "SI" - Slovenia
+	//   "SK" - Slovakia
+	//   "TH" - Thailand
+	//   "TR" - Turkey
+	//   "TW" - Taiwan
+	//   "UA" - Ukraine
+	//   "US" - United States
+	//   "VE" - Venezuela
+	//   "VN" - Viet Nam
+	//   "ZA" - South Africa
+	HolidayRegion string `json:"holidayRegion,omitempty"`
+
+	// Horizon: The number of periods ahead that need to be forecasted.
+	Horizon int64 `json:"horizon,omitempty,string"`
+
+	// IncludeDrift: Include drift when fitting an ARIMA model.
+	IncludeDrift bool `json:"includeDrift,omitempty"`
+
 	// InitialLearnRate: Specifies the initial learning rate for the line
-	// search learn rate
-	// strategy.
+	// search learn rate strategy.
 	InitialLearnRate float64 `json:"initialLearnRate,omitempty"`
 
 	// InputLabelColumns: Name of input label columns in training data.
 	InputLabelColumns []string `json:"inputLabelColumns,omitempty"`
 
+	// ItemColumn: Item column specified for matrix factorization models.
+	ItemColumn string `json:"itemColumn,omitempty"`
+
 	// KmeansInitializationColumn: The column used to provide the initial
-	// centroids for kmeans algorithm
-	// when kmeans_initialization_method is CUSTOM.
+	// centroids for kmeans algorithm when kmeans_initialization_method is
+	// CUSTOM.
 	KmeansInitializationColumn string `json:"kmeansInitializationColumn,omitempty"`
 
 	// KmeansInitializationMethod: The method used to initialize the
 	// centroids for kmeans algorithm.
 	//
 	// Possible values:
-	//   "KMEANS_INITIALIZATION_METHOD_UNSPECIFIED"
+	//   "KMEANS_INITIALIZATION_METHOD_UNSPECIFIED" - Unspecified
+	// initialization method.
 	//   "RANDOM" - Initializes the centroids randomly.
-	//   "CUSTOM" - Initializes the centroids using data specified
-	// in
+	//   "CUSTOM" - Initializes the centroids using data specified in
 	// kmeans_initialization_column.
+	//   "KMEANS_PLUS_PLUS" - Initializes with kmeans++.
 	KmeansInitializationMethod string `json:"kmeansInitializationMethod,omitempty"`
 
 	// L1Regularization: L1 regularization coefficient.
@@ -6063,8 +7703,8 @@ type TrainingOptions struct {
 	L2Regularization float64 `json:"l2Regularization,omitempty"`
 
 	// LabelClassWeights: Weights associated with each label class, for
-	// rebalancing the
-	// training data. Only applicable for classification models.
+	// rebalancing the training data. Only applicable for classification
+	// models.
 	LabelClassWeights map[string]float64 `json:"labelClassWeights,omitempty"`
 
 	// LearnRate: Learning rate in training. Used only for iterative
@@ -6090,24 +7730,34 @@ type TrainingOptions struct {
 	LossType string `json:"lossType,omitempty"`
 
 	// MaxIterations: The maximum number of iterations in training. Used
-	// only for iterative
-	// training algorithms.
+	// only for iterative training algorithms.
 	MaxIterations int64 `json:"maxIterations,omitempty,string"`
 
+	// MaxTreeDepth: Maximum depth of a tree for boosted tree models.
+	MaxTreeDepth int64 `json:"maxTreeDepth,omitempty,string"`
+
 	// MinRelativeProgress: When early_stop is true, stops training when
-	// accuracy improvement is
-	// less than 'min_relative_progress'. Used only for iterative
-	// training
-	// algorithms.
+	// accuracy improvement is less than 'min_relative_progress'. Used only
+	// for iterative training algorithms.
 	MinRelativeProgress float64 `json:"minRelativeProgress,omitempty"`
 
-	// ModelUri: [Beta] Google Cloud Storage URI from which the model was
-	// imported. Only
-	// applicable for imported models.
+	// MinSplitLoss: Minimum split loss for boosted tree models.
+	MinSplitLoss float64 `json:"minSplitLoss,omitempty"`
+
+	// ModelUri: Google Cloud Storage URI from which the model was imported.
+	// Only applicable for imported models.
 	ModelUri string `json:"modelUri,omitempty"`
+
+	// NonSeasonalOrder: A specification of the non-seasonal part of the
+	// ARIMA model: the three components (p, d, q) are the AR order, the
+	// degree of differencing, and the MA order.
+	NonSeasonalOrder *ArimaOrder `json:"nonSeasonalOrder,omitempty"`
 
 	// NumClusters: Number of clusters for clustering models.
 	NumClusters int64 `json:"numClusters,omitempty,string"`
+
+	// NumFactors: Num factors specified for matrix factorization models.
+	NumFactors int64 `json:"numFactors,omitempty,string"`
 
 	// OptimizationStrategy: Optimization strategy for training linear
 	// regression models.
@@ -6120,10 +7770,39 @@ type TrainingOptions struct {
 	// regression problem.
 	OptimizationStrategy string `json:"optimizationStrategy,omitempty"`
 
+	// PreserveInputStructs: Whether to preserve the input structs in output
+	// feature names. Suppose there is a struct A with field b. When false
+	// (default), the output feature name is A_b. When true, the output
+	// feature name is A.b.
+	PreserveInputStructs bool `json:"preserveInputStructs,omitempty"`
+
+	// Subsample: Subsample fraction of the training data to grow tree to
+	// prevent overfitting for boosted tree models.
+	Subsample float64 `json:"subsample,omitempty"`
+
+	// TimeSeriesDataColumn: Column to be designated as time series data for
+	// ARIMA model.
+	TimeSeriesDataColumn string `json:"timeSeriesDataColumn,omitempty"`
+
+	// TimeSeriesIdColumn: The time series id column that was used during
+	// ARIMA model training.
+	TimeSeriesIdColumn string `json:"timeSeriesIdColumn,omitempty"`
+
+	// TimeSeriesTimestampColumn: Column to be designated as time series
+	// timestamp for ARIMA model.
+	TimeSeriesTimestampColumn string `json:"timeSeriesTimestampColumn,omitempty"`
+
+	// UserColumn: User column specified for matrix factorization models.
+	UserColumn string `json:"userColumn,omitempty"`
+
+	// WalsAlpha: Hyperparameter for matrix factoration when implicit
+	// feedback type is specified.
+	WalsAlpha float64 `json:"walsAlpha,omitempty"`
+
 	// WarmStart: Whether to train a model from the last checkpoint.
 	WarmStart bool `json:"warmStart,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "DataSplitColumn") to
+	// ForceSendFields is a list of field names (e.g. "AutoArima") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -6131,13 +7810,12 @@ type TrainingOptions struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "DataSplitColumn") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
+	// NullFields is a list of field names (e.g. "AutoArima") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
 	NullFields []string `json:"-"`
 }
 
@@ -6151,11 +7829,15 @@ func (s *TrainingOptions) UnmarshalJSON(data []byte) error {
 	type NoMethod TrainingOptions
 	var s1 struct {
 		DataSplitEvalFraction gensupport.JSONFloat64 `json:"dataSplitEvalFraction"`
+		Dropout               gensupport.JSONFloat64 `json:"dropout"`
 		InitialLearnRate      gensupport.JSONFloat64 `json:"initialLearnRate"`
 		L1Regularization      gensupport.JSONFloat64 `json:"l1Regularization"`
 		L2Regularization      gensupport.JSONFloat64 `json:"l2Regularization"`
 		LearnRate             gensupport.JSONFloat64 `json:"learnRate"`
 		MinRelativeProgress   gensupport.JSONFloat64 `json:"minRelativeProgress"`
+		MinSplitLoss          gensupport.JSONFloat64 `json:"minSplitLoss"`
+		Subsample             gensupport.JSONFloat64 `json:"subsample"`
+		WalsAlpha             gensupport.JSONFloat64 `json:"walsAlpha"`
 		*NoMethod
 	}
 	s1.NoMethod = (*NoMethod)(s)
@@ -6163,21 +7845,33 @@ func (s *TrainingOptions) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	s.DataSplitEvalFraction = float64(s1.DataSplitEvalFraction)
+	s.Dropout = float64(s1.Dropout)
 	s.InitialLearnRate = float64(s1.InitialLearnRate)
 	s.L1Regularization = float64(s1.L1Regularization)
 	s.L2Regularization = float64(s1.L2Regularization)
 	s.LearnRate = float64(s1.LearnRate)
 	s.MinRelativeProgress = float64(s1.MinRelativeProgress)
+	s.MinSplitLoss = float64(s1.MinSplitLoss)
+	s.Subsample = float64(s1.Subsample)
+	s.WalsAlpha = float64(s1.WalsAlpha)
 	return nil
 }
 
 // TrainingRun: Information about a single training query run for the
 // model.
 type TrainingRun struct {
+	// DataSplitResult: Data split result of the training run. Only set when
+	// the input data is actually split.
+	DataSplitResult *DataSplitResult `json:"dataSplitResult,omitempty"`
+
 	// EvaluationMetrics: The evaluation metrics over training/eval data
-	// that were computed at the
-	// end of training.
+	// that were computed at the end of training.
 	EvaluationMetrics *EvaluationMetrics `json:"evaluationMetrics,omitempty"`
+
+	// GlobalExplanations: Global explanations for important features of the
+	// model. For multi-class models, there is one entry for each label
+	// class. For other models, there is only one entry in the list.
+	GlobalExplanations []*GlobalExplanation `json:"globalExplanations,omitempty"`
 
 	// Results: Output of each iteration run, results.size() <=
 	// max_iterations.
@@ -6187,19 +7881,18 @@ type TrainingRun struct {
 	StartTime string `json:"startTime,omitempty"`
 
 	// TrainingOptions: Options that were used for this training run,
-	// includes
-	// user specified and default options that were used.
+	// includes user specified and default options that were used.
 	TrainingOptions *TrainingOptions `json:"trainingOptions,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "EvaluationMetrics")
-	// to unconditionally include in API requests. By default, fields with
+	// ForceSendFields is a list of field names (e.g. "DataSplitResult") to
+	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
 	// server regardless of whether the field is empty or not. This may be
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "EvaluationMetrics") to
+	// NullFields is a list of field names (e.g. "DataSplitResult") to
 	// include in API requests with the JSON null value. By default, fields
 	// with empty values are omitted from API requests. However, any field
 	// with an empty value appearing in NullFields will be sent to the
@@ -6215,6 +7908,39 @@ func (s *TrainingRun) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type TransactionInfo struct {
+	// TransactionId: [Output-only] // [Alpha] Id of the transaction.
+	TransactionId string `json:"transactionId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "TransactionId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "TransactionId") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *TransactionInfo) MarshalJSON() ([]byte, error) {
+	type NoMethod TransactionInfo
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// UserDefinedFunctionResource: This is used for defining User Defined
+// Function (UDF) resources only when using legacy SQL. Users of
+// Standard SQL should leverage either DDL (e.g. CREATE [TEMPORARY]
+// FUNCTION ... ) or the Routines API to define UDF resources. For
+// additional information on migrating, see:
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/migrating-from-legacy-sql#differences_in_user-defined_javascript_functions
 type UserDefinedFunctionResource struct {
 	// InlineCode: [Pick one] An inline resource that contains code for a
 	// user-defined function (UDF). Providing a inline code resource is
@@ -6344,7 +8070,7 @@ func (c *DatasetsDeleteCall) Header() http.Header {
 
 func (c *DatasetsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6471,7 +8197,7 @@ func (c *DatasetsGetCall) Header() http.Header {
 
 func (c *DatasetsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6615,7 +8341,7 @@ func (c *DatasetsInsertCall) Header() http.Header {
 
 func (c *DatasetsInsertCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6795,7 +8521,7 @@ func (c *DatasetsListCall) Header() http.Header {
 
 func (c *DatasetsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6978,7 +8704,7 @@ func (c *DatasetsPatchCall) Header() http.Header {
 
 func (c *DatasetsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7129,7 +8855,7 @@ func (c *DatasetsUpdateCall) Header() http.Header {
 
 func (c *DatasetsUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7287,7 +9013,7 @@ func (c *JobsCancelCall) Header() http.Header {
 
 func (c *JobsCancelCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7452,7 +9178,7 @@ func (c *JobsGetCall) Header() http.Header {
 
 func (c *JobsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7651,7 +9377,7 @@ func (c *JobsGetQueryResultsCall) Header() http.Header {
 
 func (c *JobsGetQueryResultsCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7885,7 +9611,7 @@ func (c *JobsInsertCall) Header() http.Header {
 
 func (c *JobsInsertCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7900,7 +9626,7 @@ func (c *JobsInsertCall) doRequest(alt string) (*http.Response, error) {
 	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "projects/{projectId}/jobs")
 	if c.mediaInfo_ != nil {
-		urls = strings.Replace(urls, "https://www.googleapis.com/", "https://www.googleapis.com/upload/", 1)
+		urls = googleapi.ResolveRelative(c.s.BasePath, "/upload/bigquery/v2/projects/{projectId}/jobs")
 		c.urlParams_.Set("uploadType", c.mediaInfo_.UploadType())
 	}
 	if body == nil {
@@ -8152,7 +9878,7 @@ func (c *JobsListCall) Header() http.Header {
 
 func (c *JobsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8372,7 +10098,7 @@ func (c *JobsQueryCall) Header() http.Header {
 
 func (c *JobsQueryCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8515,7 +10241,7 @@ func (c *ModelsDeleteCall) Header() http.Header {
 
 func (c *ModelsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8651,7 +10377,7 @@ func (c *ModelsGetCall) Header() http.Header {
 
 func (c *ModelsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8774,8 +10500,7 @@ type ModelsListCall struct {
 }
 
 // List: Lists all models in the specified dataset. Requires the READER
-// dataset
-// role.
+// dataset role.
 func (r *ModelsService) List(projectId string, datasetId string) *ModelsListCall {
 	c := &ModelsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.projectId = projectId
@@ -8784,16 +10509,15 @@ func (r *ModelsService) List(projectId string, datasetId string) *ModelsListCall
 }
 
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results to return in a single response page.
-// Leverage the page tokens to iterate through the entire collection.
+// number of results to return in a single response page. Leverage the
+// page tokens to iterate through the entire collection.
 func (c *ModelsListCall) MaxResults(maxResults int64) *ModelsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
 }
 
 // PageToken sets the optional parameter "pageToken": Page token,
-// returned by a previous call to request the next page of
-// results
+// returned by a previous call to request the next page of results
 func (c *ModelsListCall) PageToken(pageToken string) *ModelsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
@@ -8836,7 +10560,7 @@ func (c *ModelsListCall) Header() http.Header {
 
 func (c *ModelsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8899,7 +10623,7 @@ func (c *ModelsListCall) Do(opts ...googleapi.CallOption) (*ListModelsResponse, 
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists all models in the specified dataset. Requires the READER dataset\nrole.",
+	//   "description": "Lists all models in the specified dataset. Requires the READER dataset role.",
 	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/models",
 	//   "httpMethod": "GET",
 	//   "id": "bigquery.models.list",
@@ -8916,13 +10640,13 @@ func (c *ModelsListCall) Do(opts ...googleapi.CallOption) (*ListModelsResponse, 
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
-	//       "description": "The maximum number of results to return in a single response page.\nLeverage the page tokens to iterate through the entire collection.",
+	//       "description": "The maximum number of results to return in a single response page. Leverage the page tokens to iterate through the entire collection.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "type": "integer"
 	//     },
 	//     "pageToken": {
-	//       "description": "Page token, returned by a previous call to request the next page of\nresults",
+	//       "description": "Page token, returned by a previous call to request the next page of results",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -9019,7 +10743,7 @@ func (c *ModelsPatchCall) Header() http.Header {
 
 func (c *ModelsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9188,7 +10912,7 @@ func (c *ProjectsGetServiceAccountCall) Header() http.Header {
 
 func (c *ProjectsGetServiceAccountCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9346,7 +11070,7 @@ func (c *ProjectsListCall) Header() http.Header {
 
 func (c *ProjectsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9504,7 +11228,7 @@ func (c *RoutinesDeleteCall) Header() http.Header {
 
 func (c *RoutinesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9603,11 +11327,11 @@ func (r *RoutinesService) Get(projectId string, datasetId string, routineId stri
 	return c
 }
 
-// FieldMask sets the optional parameter "fieldMask": If set, only the
-// Routine fields in the field mask are returned in the
-// response. If unset, all Routine fields are returned.
-func (c *RoutinesGetCall) FieldMask(fieldMask string) *RoutinesGetCall {
-	c.urlParams_.Set("fieldMask", fieldMask)
+// ReadMask sets the optional parameter "readMask": If set, only the
+// Routine fields in the field mask are returned in the response. If
+// unset, all Routine fields are returned.
+func (c *RoutinesGetCall) ReadMask(readMask string) *RoutinesGetCall {
+	c.urlParams_.Set("readMask", readMask)
 	return c
 }
 
@@ -9648,7 +11372,7 @@ func (c *RoutinesGetCall) Header() http.Header {
 
 func (c *RoutinesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9729,17 +11453,17 @@ func (c *RoutinesGetCall) Do(opts ...googleapi.CallOption) (*Routine, error) {
 	//       "required": true,
 	//       "type": "string"
 	//     },
-	//     "fieldMask": {
-	//       "description": "If set, only the Routine fields in the field mask are returned in the\nresponse. If unset, all Routine fields are returned.",
-	//       "format": "google-fieldmask",
-	//       "location": "query",
-	//       "type": "string"
-	//     },
 	//     "projectId": {
 	//       "description": "Required. Project ID of the requested routine",
 	//       "location": "path",
 	//       "pattern": "^[^/]+$",
 	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "readMask": {
+	//       "description": "If set, only the Routine fields in the field mask are returned in the response. If unset, all Routine fields are returned.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "routineId": {
@@ -9812,7 +11536,7 @@ func (c *RoutinesInsertCall) Header() http.Header {
 
 func (c *RoutinesInsertCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9929,8 +11653,7 @@ type RoutinesListCall struct {
 }
 
 // List: Lists all routines in the specified dataset. Requires the
-// READER dataset
-// role.
+// READER dataset role.
 func (r *RoutinesService) List(projectId string, datasetId string) *RoutinesListCall {
 	c := &RoutinesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.projectId = projectId
@@ -9938,19 +11661,38 @@ func (r *RoutinesService) List(projectId string, datasetId string) *RoutinesList
 	return c
 }
 
+// Filter sets the optional parameter "filter": If set, then only the
+// Routines matching this filter are returned. The current supported
+// form is either "routine_type:" or "routineType:", where is a
+// RoutineType enum. Example: "routineType:SCALAR_FUNCTION".
+func (c *RoutinesListCall) Filter(filter string) *RoutinesListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
 // MaxResults sets the optional parameter "maxResults": The maximum
-// number of results to return in a single response page.
-// Leverage the page tokens to iterate through the entire collection.
+// number of results to return in a single response page. Leverage the
+// page tokens to iterate through the entire collection.
 func (c *RoutinesListCall) MaxResults(maxResults int64) *RoutinesListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
 	return c
 }
 
 // PageToken sets the optional parameter "pageToken": Page token,
-// returned by a previous call, to request the next page of
-// results
+// returned by a previous call, to request the next page of results
 func (c *RoutinesListCall) PageToken(pageToken string) *RoutinesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// ReadMask sets the optional parameter "readMask": If set, then only
+// the Routine fields in the field mask, as well as project_id,
+// dataset_id and routine_id, are returned in the response. If unset,
+// then the following Routine fields are returned: etag, project_id,
+// dataset_id, routine_id, routine_type, creation_time,
+// last_modified_time, and language.
+func (c *RoutinesListCall) ReadMask(readMask string) *RoutinesListCall {
+	c.urlParams_.Set("readMask", readMask)
 	return c
 }
 
@@ -9991,7 +11733,7 @@ func (c *RoutinesListCall) Header() http.Header {
 
 func (c *RoutinesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10054,7 +11796,7 @@ func (c *RoutinesListCall) Do(opts ...googleapi.CallOption) (*ListRoutinesRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists all routines in the specified dataset. Requires the READER dataset\nrole.",
+	//   "description": "Lists all routines in the specified dataset. Requires the READER dataset role.",
 	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/routines",
 	//   "httpMethod": "GET",
 	//   "id": "bigquery.routines.list",
@@ -10070,14 +11812,19 @@ func (c *RoutinesListCall) Do(opts ...googleapi.CallOption) (*ListRoutinesRespon
 	//       "required": true,
 	//       "type": "string"
 	//     },
+	//     "filter": {
+	//       "description": "If set, then only the Routines matching this filter are returned. The current supported form is either \"routine_type:\" or \"routineType:\", where is a RoutineType enum. Example: \"routineType:SCALAR_FUNCTION\".",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "maxResults": {
-	//       "description": "The maximum number of results to return in a single response page.\nLeverage the page tokens to iterate through the entire collection.",
+	//       "description": "The maximum number of results to return in a single response page. Leverage the page tokens to iterate through the entire collection.",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "type": "integer"
 	//     },
 	//     "pageToken": {
-	//       "description": "Page token, returned by a previous call, to request the next page of\nresults",
+	//       "description": "Page token, returned by a previous call, to request the next page of results",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -10086,6 +11833,12 @@ func (c *RoutinesListCall) Do(opts ...googleapi.CallOption) (*ListRoutinesRespon
 	//       "location": "path",
 	//       "pattern": "^[^/]+$",
 	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "readMask": {
+	//       "description": "If set, then only the Routine fields in the field mask, as well as project_id, dataset_id and routine_id, are returned in the response. If unset, then the following Routine fields are returned: etag, project_id, dataset_id, routine_id, routine_type, creation_time, last_modified_time, and language.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
 	//       "type": "string"
 	//     }
 	//   },
@@ -10138,8 +11891,7 @@ type RoutinesUpdateCall struct {
 }
 
 // Update: Updates information in an existing routine. The update method
-// replaces the
-// entire Routine resource.
+// replaces the entire Routine resource.
 func (r *RoutinesService) Update(projectId string, datasetId string, routineId string, routine *Routine) *RoutinesUpdateCall {
 	c := &RoutinesUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.projectId = projectId
@@ -10176,7 +11928,7 @@ func (c *RoutinesUpdateCall) Header() http.Header {
 
 func (c *RoutinesUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10242,7 +11994,7 @@ func (c *RoutinesUpdateCall) Do(opts ...googleapi.CallOption) (*Routine, error) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates information in an existing routine. The update method replaces the\nentire Routine resource.",
+	//   "description": "Updates information in an existing routine. The update method replaces the entire Routine resource.",
 	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}",
 	//   "httpMethod": "PUT",
 	//   "id": "bigquery.routines.update",
@@ -10284,6 +12036,658 @@ func (c *RoutinesUpdateCall) Do(opts ...googleapi.CallOption) (*Routine, error) 
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/bigquery",
 	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// method id "bigquery.rowAccessPolicies.getIamPolicy":
+
+type RowAccessPoliciesGetIamPolicyCall struct {
+	s                   *Service
+	resource            string
+	getiampolicyrequest *GetIamPolicyRequest
+	urlParams_          gensupport.URLParams
+	ctx_                context.Context
+	header_             http.Header
+}
+
+// GetIamPolicy: Gets the access control policy for a resource. Returns
+// an empty policy if the resource exists and does not have a policy
+// set.
+func (r *RowAccessPoliciesService) GetIamPolicy(resource string, getiampolicyrequest *GetIamPolicyRequest) *RowAccessPoliciesGetIamPolicyCall {
+	c := &RowAccessPoliciesGetIamPolicyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.resource = resource
+	c.getiampolicyrequest = getiampolicyrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *RowAccessPoliciesGetIamPolicyCall) Fields(s ...googleapi.Field) *RowAccessPoliciesGetIamPolicyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *RowAccessPoliciesGetIamPolicyCall) Context(ctx context.Context) *RowAccessPoliciesGetIamPolicyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *RowAccessPoliciesGetIamPolicyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *RowAccessPoliciesGetIamPolicyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.getiampolicyrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{+resource}:getIamPolicy")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("POST", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"resource": c.resource,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.rowAccessPolicies.getIamPolicy" call.
+// Exactly one of *Policy or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Policy.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *RowAccessPoliciesGetIamPolicyCall) Do(opts ...googleapi.CallOption) (*Policy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Policy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets the access control policy for a resource. Returns an empty policy if the resource exists and does not have a policy set.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/rowAccessPolicies/{rowAccessPoliciesId}:getIamPolicy",
+	//   "httpMethod": "POST",
+	//   "id": "bigquery.rowAccessPolicies.getIamPolicy",
+	//   "parameterOrder": [
+	//     "resource"
+	//   ],
+	//   "parameters": {
+	//     "resource": {
+	//       "description": "REQUIRED: The resource for which the policy is being requested. See the operation documentation for the appropriate value for this field.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/datasets/[^/]+/tables/[^/]+/rowAccessPolicies/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{+resource}:getIamPolicy",
+	//   "request": {
+	//     "$ref": "GetIamPolicyRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Policy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/bigquery.readonly",
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/cloud-platform.read-only"
+	//   ]
+	// }
+
+}
+
+// method id "bigquery.rowAccessPolicies.list":
+
+type RowAccessPoliciesListCall struct {
+	s            *Service
+	projectId    string
+	datasetId    string
+	tableId      string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists all row access policies on the specified table.
+func (r *RowAccessPoliciesService) List(projectId string, datasetId string, tableId string) *RowAccessPoliciesListCall {
+	c := &RowAccessPoliciesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.projectId = projectId
+	c.datasetId = datasetId
+	c.tableId = tableId
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in a single response page. Leverage the page
+// tokens to iterate through the entire collection.
+func (c *RowAccessPoliciesListCall) PageSize(pageSize int64) *RowAccessPoliciesListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": Page token,
+// returned by a previous call, to request the next page of results.
+func (c *RowAccessPoliciesListCall) PageToken(pageToken string) *RowAccessPoliciesListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *RowAccessPoliciesListCall) Fields(s ...googleapi.Field) *RowAccessPoliciesListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *RowAccessPoliciesListCall) IfNoneMatch(entityTag string) *RowAccessPoliciesListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *RowAccessPoliciesListCall) Context(ctx context.Context) *RowAccessPoliciesListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *RowAccessPoliciesListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *RowAccessPoliciesListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "projects/{+projectId}/datasets/{+datasetId}/tables/{+tableId}/rowAccessPolicies")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("GET", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"projectId": c.projectId,
+		"datasetId": c.datasetId,
+		"tableId":   c.tableId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.rowAccessPolicies.list" call.
+// Exactly one of *ListRowAccessPoliciesResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *ListRowAccessPoliciesResponse.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *RowAccessPoliciesListCall) Do(opts ...googleapi.CallOption) (*ListRowAccessPoliciesResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListRowAccessPoliciesResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Lists all row access policies on the specified table.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/rowAccessPolicies",
+	//   "httpMethod": "GET",
+	//   "id": "bigquery.rowAccessPolicies.list",
+	//   "parameterOrder": [
+	//     "projectId",
+	//     "datasetId",
+	//     "tableId"
+	//   ],
+	//   "parameters": {
+	//     "datasetId": {
+	//       "description": "Required. Dataset ID of row access policies to list.",
+	//       "location": "path",
+	//       "pattern": "^[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "pageSize": {
+	//       "description": "The maximum number of results to return in a single response page. Leverage the page tokens to iterate through the entire collection.",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "Page token, returned by a previous call, to request the next page of results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "projectId": {
+	//       "description": "Required. Project ID of the row access policies to list.",
+	//       "location": "path",
+	//       "pattern": "^[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "tableId": {
+	//       "description": "Required. Table ID of the table to list row access policies.",
+	//       "location": "path",
+	//       "pattern": "^[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "projects/{+projectId}/datasets/{+datasetId}/tables/{+tableId}/rowAccessPolicies",
+	//   "response": {
+	//     "$ref": "ListRowAccessPoliciesResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/bigquery.readonly",
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/cloud-platform.read-only"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *RowAccessPoliciesListCall) Pages(ctx context.Context, f func(*ListRowAccessPoliciesResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "bigquery.rowAccessPolicies.setIamPolicy":
+
+type RowAccessPoliciesSetIamPolicyCall struct {
+	s                   *Service
+	resource            string
+	setiampolicyrequest *SetIamPolicyRequest
+	urlParams_          gensupport.URLParams
+	ctx_                context.Context
+	header_             http.Header
+}
+
+// SetIamPolicy: Sets the access control policy on the specified
+// resource. Replaces any existing policy. Can return `NOT_FOUND`,
+// `INVALID_ARGUMENT`, and `PERMISSION_DENIED` errors.
+func (r *RowAccessPoliciesService) SetIamPolicy(resource string, setiampolicyrequest *SetIamPolicyRequest) *RowAccessPoliciesSetIamPolicyCall {
+	c := &RowAccessPoliciesSetIamPolicyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.resource = resource
+	c.setiampolicyrequest = setiampolicyrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *RowAccessPoliciesSetIamPolicyCall) Fields(s ...googleapi.Field) *RowAccessPoliciesSetIamPolicyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *RowAccessPoliciesSetIamPolicyCall) Context(ctx context.Context) *RowAccessPoliciesSetIamPolicyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *RowAccessPoliciesSetIamPolicyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *RowAccessPoliciesSetIamPolicyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.setiampolicyrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{+resource}:setIamPolicy")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("POST", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"resource": c.resource,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.rowAccessPolicies.setIamPolicy" call.
+// Exactly one of *Policy or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Policy.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *RowAccessPoliciesSetIamPolicyCall) Do(opts ...googleapi.CallOption) (*Policy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Policy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Sets the access control policy on the specified resource. Replaces any existing policy. Can return `NOT_FOUND`, `INVALID_ARGUMENT`, and `PERMISSION_DENIED` errors.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/rowAccessPolicies/{rowAccessPoliciesId}:setIamPolicy",
+	//   "httpMethod": "POST",
+	//   "id": "bigquery.rowAccessPolicies.setIamPolicy",
+	//   "parameterOrder": [
+	//     "resource"
+	//   ],
+	//   "parameters": {
+	//     "resource": {
+	//       "description": "REQUIRED: The resource for which the policy is being specified. See the operation documentation for the appropriate value for this field.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/datasets/[^/]+/tables/[^/]+/rowAccessPolicies/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{+resource}:setIamPolicy",
+	//   "request": {
+	//     "$ref": "SetIamPolicyRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Policy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// method id "bigquery.rowAccessPolicies.testIamPermissions":
+
+type RowAccessPoliciesTestIamPermissionsCall struct {
+	s                         *Service
+	resource                  string
+	testiampermissionsrequest *TestIamPermissionsRequest
+	urlParams_                gensupport.URLParams
+	ctx_                      context.Context
+	header_                   http.Header
+}
+
+// TestIamPermissions: Returns permissions that a caller has on the
+// specified resource. If the resource does not exist, this will return
+// an empty set of permissions, not a `NOT_FOUND` error. Note: This
+// operation is designed to be used for building permission-aware UIs
+// and command-line tools, not for authorization checking. This
+// operation may "fail open" without warning.
+func (r *RowAccessPoliciesService) TestIamPermissions(resource string, testiampermissionsrequest *TestIamPermissionsRequest) *RowAccessPoliciesTestIamPermissionsCall {
+	c := &RowAccessPoliciesTestIamPermissionsCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.resource = resource
+	c.testiampermissionsrequest = testiampermissionsrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *RowAccessPoliciesTestIamPermissionsCall) Fields(s ...googleapi.Field) *RowAccessPoliciesTestIamPermissionsCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *RowAccessPoliciesTestIamPermissionsCall) Context(ctx context.Context) *RowAccessPoliciesTestIamPermissionsCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *RowAccessPoliciesTestIamPermissionsCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *RowAccessPoliciesTestIamPermissionsCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.testiampermissionsrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{+resource}:testIamPermissions")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("POST", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"resource": c.resource,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.rowAccessPolicies.testIamPermissions" call.
+// Exactly one of *TestIamPermissionsResponse or error will be non-nil.
+// Any non-2xx status code is an error. Response headers are in either
+// *TestIamPermissionsResponse.ServerResponse.Header or (if a response
+// was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *RowAccessPoliciesTestIamPermissionsCall) Do(opts ...googleapi.CallOption) (*TestIamPermissionsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &TestIamPermissionsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns permissions that a caller has on the specified resource. If the resource does not exist, this will return an empty set of permissions, not a `NOT_FOUND` error. Note: This operation is designed to be used for building permission-aware UIs and command-line tools, not for authorization checking. This operation may \"fail open\" without warning.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/rowAccessPolicies/{rowAccessPoliciesId}:testIamPermissions",
+	//   "httpMethod": "POST",
+	//   "id": "bigquery.rowAccessPolicies.testIamPermissions",
+	//   "parameterOrder": [
+	//     "resource"
+	//   ],
+	//   "parameters": {
+	//     "resource": {
+	//       "description": "REQUIRED: The resource for which the policy detail is being requested. See the operation documentation for the appropriate value for this field.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/datasets/[^/]+/tables/[^/]+/rowAccessPolicies/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{+resource}:testIamPermissions",
+	//   "request": {
+	//     "$ref": "TestIamPermissionsRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "TestIamPermissionsResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/bigquery.readonly",
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/cloud-platform.read-only"
 	//   ]
 	// }
 
@@ -10340,7 +12744,7 @@ func (c *TabledataInsertAllCall) Header() http.Header {
 
 func (c *TabledataInsertAllCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10539,7 +12943,7 @@ func (c *TabledataListCall) Header() http.Header {
 
 func (c *TabledataListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10737,7 +13141,7 @@ func (c *TablesDeleteCall) Header() http.Header {
 
 func (c *TablesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10879,7 +13283,7 @@ func (c *TablesGetCall) Header() http.Header {
 
 func (c *TablesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10990,6 +13394,151 @@ func (c *TablesGetCall) Do(opts ...googleapi.CallOption) (*Table, error) {
 
 }
 
+// method id "bigquery.tables.getIamPolicy":
+
+type TablesGetIamPolicyCall struct {
+	s                   *Service
+	resource            string
+	getiampolicyrequest *GetIamPolicyRequest
+	urlParams_          gensupport.URLParams
+	ctx_                context.Context
+	header_             http.Header
+}
+
+// GetIamPolicy: Gets the access control policy for a resource. Returns
+// an empty policy if the resource exists and does not have a policy
+// set.
+func (r *TablesService) GetIamPolicy(resource string, getiampolicyrequest *GetIamPolicyRequest) *TablesGetIamPolicyCall {
+	c := &TablesGetIamPolicyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.resource = resource
+	c.getiampolicyrequest = getiampolicyrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *TablesGetIamPolicyCall) Fields(s ...googleapi.Field) *TablesGetIamPolicyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *TablesGetIamPolicyCall) Context(ctx context.Context) *TablesGetIamPolicyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *TablesGetIamPolicyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *TablesGetIamPolicyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.getiampolicyrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{+resource}:getIamPolicy")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("POST", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"resource": c.resource,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.tables.getIamPolicy" call.
+// Exactly one of *Policy or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Policy.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *TablesGetIamPolicyCall) Do(opts ...googleapi.CallOption) (*Policy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Policy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets the access control policy for a resource. Returns an empty policy if the resource exists and does not have a policy set.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy",
+	//   "httpMethod": "POST",
+	//   "id": "bigquery.tables.getIamPolicy",
+	//   "parameterOrder": [
+	//     "resource"
+	//   ],
+	//   "parameters": {
+	//     "resource": {
+	//       "description": "REQUIRED: The resource for which the policy is being requested. See the operation documentation for the appropriate value for this field.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/datasets/[^/]+/tables/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{+resource}:getIamPolicy",
+	//   "request": {
+	//     "$ref": "GetIamPolicyRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Policy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/bigquery.readonly",
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/cloud-platform.read-only"
+	//   ]
+	// }
+
+}
+
 // method id "bigquery.tables.insert":
 
 type TablesInsertCall struct {
@@ -11038,7 +13587,7 @@ func (c *TablesInsertCall) Header() http.Header {
 
 func (c *TablesInsertCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11211,7 +13760,7 @@ func (c *TablesListCall) Header() http.Header {
 
 func (c *TablesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11394,7 +13943,7 @@ func (c *TablesPatchCall) Header() http.Header {
 
 func (c *TablesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11503,6 +14052,297 @@ func (c *TablesPatchCall) Do(opts ...googleapi.CallOption) (*Table, error) {
 
 }
 
+// method id "bigquery.tables.setIamPolicy":
+
+type TablesSetIamPolicyCall struct {
+	s                   *Service
+	resource            string
+	setiampolicyrequest *SetIamPolicyRequest
+	urlParams_          gensupport.URLParams
+	ctx_                context.Context
+	header_             http.Header
+}
+
+// SetIamPolicy: Sets the access control policy on the specified
+// resource. Replaces any existing policy. Can return `NOT_FOUND`,
+// `INVALID_ARGUMENT`, and `PERMISSION_DENIED` errors.
+func (r *TablesService) SetIamPolicy(resource string, setiampolicyrequest *SetIamPolicyRequest) *TablesSetIamPolicyCall {
+	c := &TablesSetIamPolicyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.resource = resource
+	c.setiampolicyrequest = setiampolicyrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *TablesSetIamPolicyCall) Fields(s ...googleapi.Field) *TablesSetIamPolicyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *TablesSetIamPolicyCall) Context(ctx context.Context) *TablesSetIamPolicyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *TablesSetIamPolicyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *TablesSetIamPolicyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.setiampolicyrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{+resource}:setIamPolicy")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("POST", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"resource": c.resource,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.tables.setIamPolicy" call.
+// Exactly one of *Policy or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Policy.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *TablesSetIamPolicyCall) Do(opts ...googleapi.CallOption) (*Policy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Policy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Sets the access control policy on the specified resource. Replaces any existing policy. Can return `NOT_FOUND`, `INVALID_ARGUMENT`, and `PERMISSION_DENIED` errors.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:setIamPolicy",
+	//   "httpMethod": "POST",
+	//   "id": "bigquery.tables.setIamPolicy",
+	//   "parameterOrder": [
+	//     "resource"
+	//   ],
+	//   "parameters": {
+	//     "resource": {
+	//       "description": "REQUIRED: The resource for which the policy is being specified. See the operation documentation for the appropriate value for this field.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/datasets/[^/]+/tables/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{+resource}:setIamPolicy",
+	//   "request": {
+	//     "$ref": "SetIamPolicyRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Policy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// method id "bigquery.tables.testIamPermissions":
+
+type TablesTestIamPermissionsCall struct {
+	s                         *Service
+	resource                  string
+	testiampermissionsrequest *TestIamPermissionsRequest
+	urlParams_                gensupport.URLParams
+	ctx_                      context.Context
+	header_                   http.Header
+}
+
+// TestIamPermissions: Returns permissions that a caller has on the
+// specified resource. If the resource does not exist, this will return
+// an empty set of permissions, not a `NOT_FOUND` error. Note: This
+// operation is designed to be used for building permission-aware UIs
+// and command-line tools, not for authorization checking. This
+// operation may "fail open" without warning.
+func (r *TablesService) TestIamPermissions(resource string, testiampermissionsrequest *TestIamPermissionsRequest) *TablesTestIamPermissionsCall {
+	c := &TablesTestIamPermissionsCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.resource = resource
+	c.testiampermissionsrequest = testiampermissionsrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *TablesTestIamPermissionsCall) Fields(s ...googleapi.Field) *TablesTestIamPermissionsCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *TablesTestIamPermissionsCall) Context(ctx context.Context) *TablesTestIamPermissionsCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *TablesTestIamPermissionsCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *TablesTestIamPermissionsCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.testiampermissionsrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{+resource}:testIamPermissions")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("POST", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"resource": c.resource,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "bigquery.tables.testIamPermissions" call.
+// Exactly one of *TestIamPermissionsResponse or error will be non-nil.
+// Any non-2xx status code is an error. Response headers are in either
+// *TestIamPermissionsResponse.ServerResponse.Header or (if a response
+// was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *TablesTestIamPermissionsCall) Do(opts ...googleapi.CallOption) (*TestIamPermissionsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &TestIamPermissionsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns permissions that a caller has on the specified resource. If the resource does not exist, this will return an empty set of permissions, not a `NOT_FOUND` error. Note: This operation is designed to be used for building permission-aware UIs and command-line tools, not for authorization checking. This operation may \"fail open\" without warning.",
+	//   "flatPath": "projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:testIamPermissions",
+	//   "httpMethod": "POST",
+	//   "id": "bigquery.tables.testIamPermissions",
+	//   "parameterOrder": [
+	//     "resource"
+	//   ],
+	//   "parameters": {
+	//     "resource": {
+	//       "description": "REQUIRED: The resource for which the policy detail is being requested. See the operation documentation for the appropriate value for this field.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/datasets/[^/]+/tables/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{+resource}:testIamPermissions",
+	//   "request": {
+	//     "$ref": "TestIamPermissionsRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "TestIamPermissionsResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/bigquery",
+	//     "https://www.googleapis.com/auth/bigquery.readonly",
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/cloud-platform.read-only"
+	//   ]
+	// }
+
+}
+
 // method id "bigquery.tables.update":
 
 type TablesUpdateCall struct {
@@ -11555,7 +14395,7 @@ func (c *TablesUpdateCall) Header() http.Header {
 
 func (c *TablesUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.11.0 gdcl/20190926")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20210322")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}

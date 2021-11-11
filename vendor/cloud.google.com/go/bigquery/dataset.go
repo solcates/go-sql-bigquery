@@ -642,6 +642,7 @@ type AccessEntry struct {
 	EntityType EntityType // The type of entity
 	Entity     string     // The entity (individual or group) granted access
 	View       *Table     // The view granted access (EntityType must be ViewEntity)
+	Routine    *Routine   // The routine granted access (only UDF currently supported)
 }
 
 // AccessRole is the level of access to grant to a dataset.
@@ -673,8 +674,15 @@ const (
 	// allAuthenticatedUsers.
 	SpecialGroupEntity
 
-	// ViewEntity is a BigQuery view.
+	// ViewEntity is a BigQuery logical view.
 	ViewEntity
+
+	// IAMMemberEntity represents entities present in IAM but not represented using
+	// the other entity types.
+	IAMMemberEntity
+
+	// RoutineEntity is a BigQuery routine, referencing a User Defined Function (UDF).
+	RoutineEntity
 )
 
 func (e *AccessEntry) toBQ() (*bq.DatasetAccess, error) {
@@ -690,6 +698,10 @@ func (e *AccessEntry) toBQ() (*bq.DatasetAccess, error) {
 		q.SpecialGroup = e.Entity
 	case ViewEntity:
 		q.View = e.View.toBQ()
+	case IAMMemberEntity:
+		q.IamMember = e.Entity
+	case RoutineEntity:
+		q.Routine = e.Routine.toBQ()
 	default:
 		return nil, fmt.Errorf("bigquery: unknown entity type %d", e.EntityType)
 	}
@@ -714,6 +726,12 @@ func bqToAccessEntry(q *bq.DatasetAccess, c *Client) (*AccessEntry, error) {
 	case q.View != nil:
 		e.View = c.DatasetInProject(q.View.ProjectId, q.View.DatasetId).Table(q.View.TableId)
 		e.EntityType = ViewEntity
+	case q.IamMember != "":
+		e.Entity = q.IamMember
+		e.EntityType = IAMMemberEntity
+	case q.Routine != nil:
+		e.Routine = c.DatasetInProject(q.Routine.ProjectId, q.Routine.DatasetId).Routine(q.Routine.RoutineId)
+		e.EntityType = RoutineEntity
 	default:
 		return nil, errors.New("bigquery: invalid access value")
 	}

@@ -27,14 +27,14 @@ import (
 	bq "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
-	htransport "google.golang.org/api/transport/http"
 )
 
 const (
-	prodAddr = "https://www.googleapis.com/bigquery/v2/"
 	// Scope is the Oauth2 scope for the service.
-	Scope     = "https://www.googleapis.com/auth/bigquery"
-	userAgent = "gcloud-golang-bigquery/20160429"
+	// For relevant BigQuery scopes, see:
+	// https://developers.google.com/identity/protocols/googlescopes#bigqueryv2
+	Scope           = "https://www.googleapis.com/auth/bigquery"
+	userAgentPrefix = "gcloud-golang-bigquery"
 )
 
 var xGoogHeader = fmt.Sprintf("gl-go/%s gccl/%s", version.Go(), version.Repo)
@@ -58,20 +58,14 @@ type Client struct {
 // Operations performed via the client are billed to the specified GCP project.
 func NewClient(ctx context.Context, projectID string, opts ...option.ClientOption) (*Client, error) {
 	o := []option.ClientOption{
-		option.WithEndpoint(prodAddr),
 		option.WithScopes(Scope),
-		option.WithUserAgent(userAgent),
+		option.WithUserAgent(fmt.Sprintf("%s/%s", userAgentPrefix, version.Repo)),
 	}
 	o = append(o, opts...)
-	httpClient, endpoint, err := htransport.NewClient(ctx, o...)
-	if err != nil {
-		return nil, fmt.Errorf("bigquery: dialing: %v", err)
-	}
-	bqs, err := bq.New(httpClient)
+	bqs, err := bq.NewService(ctx, o...)
 	if err != nil {
 		return nil, fmt.Errorf("bigquery: constructing client: %v", err)
 	}
-	bqs.BasePath = endpoint
 	c := &Client{
 		projectID: projectID,
 		bqs:       bqs,
@@ -115,6 +109,28 @@ func (c *Client) insertJob(ctx context.Context, job *bq.Job, media io.Reader) (*
 	return bqToJob(res, c)
 }
 
+// runQuery invokes the optimized query path.
+// Due to differences in options it supports, it cannot be used for all existing
+// jobs.insert requests that are query jobs.
+func (c *Client) runQuery(ctx context.Context, queryRequest *bq.QueryRequest) (*bq.QueryResponse, error) {
+	call := c.bqs.Jobs.Query(c.projectID, queryRequest)
+	setClientHeader(call.Header())
+
+	var res *bq.QueryResponse
+	var err error
+	invoke := func() error {
+		res, err = call.Do()
+		return err
+	}
+
+	// We control request ID, so we can always runWithRetry.
+	err = runWithRetry(ctx, invoke)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 // Convert a number of milliseconds since the Unix epoch to a time.Time.
 // Treat an input of zero specially: convert it to the zero time,
 // rather than the start of the epoch.
@@ -150,6 +166,17 @@ func runWithRetry(ctx context.Context, call func() error) error {
 // retryable; these are returned by systems between the client and the BigQuery
 // service.
 func retryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Special case due to http2: https://github.com/googleapis/google-cloud-go/issues/1793
+	// Due to Go's default being higher for streams-per-connection than is accepted by the
+	// BQ backend, it's possible to get streams refused immediately after a connection is
+	// started but before we receive SETTINGS frame from the backend.  This generally only
+	// happens when we try to enqueue > 100 requests onto a newly initiated connection.
+	if err.Error() == "http2: stream closed" {
+		return true
+	}
 	e, ok := err.(*googleapi.Error)
 	if !ok {
 		return false
