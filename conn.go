@@ -248,10 +248,6 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Val
 		rs: resultSet{},
 		c:  c,
 	}
-	for _, column := range rowsIterator.Schema {
-		res.columns = append(res.columns, column.Name)
-		res.types = append(res.types, fmt.Sprintf("%v", column.Type))
-	}
 	for {
 		var row []bigquery.Value
 		err := rowsIterator.Next(&row)
@@ -262,6 +258,10 @@ func (c *Conn) queryContext(ctx context.Context, query string, args []driver.Val
 			return nil, err
 		}
 		res.rs.data = append(res.rs.data, row)
+	}
+	for _, column := range rowsIterator.Schema {
+		res.columns = append(res.columns, column.Name)
+		res.types = append(res.types, fmt.Sprintf("%v", column.Type))
 	}
 
 	return res, nil
